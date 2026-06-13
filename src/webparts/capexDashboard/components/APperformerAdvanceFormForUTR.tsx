@@ -9,10 +9,12 @@ import {
 import { useEffect, useState } from "react";
 import { IPeoplePickerContext } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 //import 'bootstrap/dist/css/bootstrap.min.css';
+import Swal from "sweetalert2";
 import logo from "../assets/sona-comstarlogo.png";
 interface IProps {
   context: any;
-  itemId: number; 
+  itemId: number;
+  onClose?: () => void;
 }
 interface IVendor {
   Id: number;
@@ -22,25 +24,27 @@ interface IVendor {
 const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
   context,
   itemId,
-}) => {const actionLock = React.useRef(false);
+  onClose,
+}) => {
+  const actionLock = React.useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sp = spfi().using(SPFx(context));
   const [previousAdvances, setPreviousAdvances] = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const today = new Date();
-const localDate: string = new Date(
-  today.getTime() - today.getTimezoneOffset() * 60000
-)
-  .toISOString()
-  .split("T")[0];
+  const localDate: string = new Date(
+    today.getTime() - today.getTimezoneOffset() * 60000,
+  )
+    .toISOString()
+    .split("T")[0];
   const [employee, setEmployee] = useState<any>({});
   const [itemData, setItemData] = useState<any>(null);
   const [approverRemarks, setApproverRemarks] = useState("");
-  
+
   const [selectedVendorName, setSelectedVendorName] = useState("");
   const [vendors, setVendors] = useState<IVendor[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
-  
+
   const [UTRDate, setUTRDate] = useState("");
   const [UTRNumber, setUTRNumber] = useState("");
   const [UTRRemarks, setUTRRemarks] = useState("");
@@ -52,7 +56,7 @@ const localDate: string = new Date(
     msGraphClientFactory: context.msGraphClientFactory,
     spHttpClient: context.spHttpClient,
   };
-const getLoggedInUser = async () => {
+  const getLoggedInUser = async () => {
     try {
       const currentUser = await sp.web.currentUser();
       const email = currentUser.Email;
@@ -85,10 +89,10 @@ const getLoggedInUser = async () => {
   const getPreviousAdvances = async (vendorId: number) => {
     try {
       debugger;
-       if (!vendorId) {
-      setPreviousAdvances([]);
-      return;
-    }
+      if (!vendorId) {
+        setPreviousAdvances([]);
+        return;
+      }
       console.log("Fetching for Vendor:", vendorId);
 
       const data = await sp.web.lists
@@ -139,7 +143,7 @@ const getLoggedInUser = async () => {
     }
   };
   // ✅ Fetch Item by ID
-  
+
   const getItemById = async (itemId: any) => {
     try {
       debugger;
@@ -178,13 +182,12 @@ const getLoggedInUser = async () => {
           "VoucherDate",
           "VoucherNumber",
           "ApproverRemarks",
-           "InstallationDetails",
+          "InstallationDetails",
           "FinalPaymentAgainstPO",
           "ApprovalMatrix",
           "WorkflowHistory",
-          
-         "RequestorName"
 
+          "RequestorName",
         )();
 
       console.log("ITEM DATA:", item.RequestorName);
@@ -240,7 +243,7 @@ const getLoggedInUser = async () => {
     }
   };
 
-useEffect(() => {
+  useEffect(() => {
     if (!context || !itemId) return;
     debugger;
     const loadData = async () => {
@@ -248,10 +251,8 @@ useEffect(() => {
 
       await getLoggedInUser();
 
-      
       await getVendors();
 
-     
       await getItemById(itemId);
     };
 
@@ -268,54 +269,68 @@ useEffect(() => {
 
   // ✅ Approve
   const handleApprove = async () => {
-
-     if (actionLock.current) return;
+    if (actionLock.current) return;
 
     // actionLock.current = true;
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-       if (!UTRDate || UTRDate.trim() === "") {
-        alert("Please enter UTR Date");
-       setIsSubmitting(false);
+      if (!UTRDate || UTRDate.trim() === "") {
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "Please enter UTR Date.",
+          confirmButtonText: "OK",
+        });
+        setIsSubmitting(false);
         return;
       }
-       if (UTRDate > localDate) {
-      alert("UTR date cannot be a future date");
-      // return;
-       setIsSubmitting(false);
-        return;
-    }
-
-      if (!UTRNumber || UTRNumber.trim() === "") {
-        alert("Please enter UTR Number");
+      if (UTRDate > localDate) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "UTR date cannot be a future date.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
 
+      if (!UTRNumber || UTRNumber.trim() === "") {
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "Please enter UTR Number.",
+          confirmButtonText: "OK",
+        });
+        setIsSubmitting(false);
+        return;
+      }
       if (!UTRRemarks || UTRRemarks.trim() === "") {
-        alert("Please enter UTR Remarks");
-       setIsSubmitting(false);
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
+        setIsSubmitting(false);
         return;
       }
 
-
-      // 🔥 HISTORY
+      // HISTORY
       const history = itemData.WorkflowHistory
-        ? (typeof itemData.WorkflowHistory === "string"
+        ? typeof itemData.WorkflowHistory === "string"
           ? JSON.parse(itemData.WorkflowHistory)
-          : itemData.WorkflowHistory)
+          : itemData.WorkflowHistory
         : [];
 
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Paid",
         Comment: UTRRemarks,
-        Date: new Date().toISOString()
+        Date: new Date().toISOString(),
       });
 
-      // 🔥 MATRIX
-     
       await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
@@ -324,52 +339,65 @@ useEffect(() => {
           UTRDate: UTRDate ? new Date(UTRDate) : null,
           UTRNumber: UTRNumber,
           UTRRemarks: UTRRemarks,
-
           Status: "Paid",
 
-         WorkflowHistory: JSON.stringify(history),
-          //ApprovalMatrix: JSON.stringify(flow),
+          // Clear pending approver after final completion
+          CurrentApproverId: null,
+          PendingWth: "",
 
-         // CurrentApproverId: null
+          WorkflowHistory: JSON.stringify(history),
         });
 
-      alert("Paid successfully ✅");
-
-      window.location.href =
-        "https://isriglobal.sharepoint.com/sites/SonaFinance/SitePages/CapexPayment.aspx?page=Performer";
-
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Payment marked as Paid successfully.",
+        confirmButtonText: "OK",
+      });
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error("Approve error:", error);
-      alert("Error ❌");
-    }
-    finally {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while processing the payment.",
+        confirmButtonText: "OK",
+      });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   // ✅ Sent Back
   const handleSendBack = async () => {
-     if (actionLock.current) return;
+    if (actionLock.current) return;
     // actionLock.current = true;
     if (isSubmitting) return;
     try {
-     if (!UTRRemarks || UTRRemarks.trim() === "") {
-        alert("Please enter UTR Remarks");
-       setIsSubmitting(false);
+      if (!UTRRemarks || UTRRemarks.trim() === "") {
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
+        setIsSubmitting(false);
         return;
       }
 
       const history = itemData.WorkflowHistory
-        ? (typeof itemData.WorkflowHistory === "string"
+        ? typeof itemData.WorkflowHistory === "string"
           ? JSON.parse(itemData.WorkflowHistory)
-          : itemData.WorkflowHistory)
+          : itemData.WorkflowHistory
         : [];
 
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Send Back",
         Comment: UTRRemarks,
-        Date: new Date().toISOString()
+        Date: new Date().toISOString(),
       });
 
       const flow = itemData.ApprovalMatrix
@@ -378,9 +406,7 @@ useEffect(() => {
 
       const currentUserId = context.pageContext.legacyPageContext.userId;
 
-      const currentIndex = flow.findIndex(
-        (a: any) => a.Id === currentUserId
-      );
+      const currentIndex = flow.findIndex((a: any) => a.Id === currentUserId);
 
       if (currentIndex !== -1) {
         flow[currentIndex].Status = "Send Back";
@@ -393,48 +419,62 @@ useEffect(() => {
           ApproverRemarks: approverRemarks,
           Status: "Send Back",
 
-         WorkflowHistory: JSON.stringify(history),
+          WorkflowHistory: JSON.stringify(history),
           ////ApprovalMatrix: JSON.stringify(flow),
 
-         // CurrentApproverId: itemData.CurrentApproverId
+          // CurrentApproverId: itemData.CurrentApproverId
         });
 
-      alert("Send Back ✅");
-
-      window.location.href =
-        "https://isriglobal.sharepoint.com/sites/SonaFinance/SitePages/CapexPayment.aspx?page=Performer";
-
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Request sent back successfully.",
+        confirmButtonText: "OK",
+      });
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error(error);
-    }
-    finally {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while sending the request back.",
+        confirmButtonText: "OK",
+      });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   // ✅ Reject
   const handleReject = async () => {
-     if (actionLock.current) return;
+    if (actionLock.current) return;
     // actionLock.current = true;
     if (isSubmitting) return;
     try {
       if (!UTRRemarks || UTRRemarks.trim() === "") {
-        alert("Please enter UTR Remarks");
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
 
       const history = itemData.WorkflowHistory
-        ? (typeof itemData.WorkflowHistory === "string"
+        ? typeof itemData.WorkflowHistory === "string"
           ? JSON.parse(itemData.WorkflowHistory)
-          : itemData.WorkflowHistory)
+          : itemData.WorkflowHistory
         : [];
 
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Rejected",
         Comment: UTRRemarks,
-        Date: new Date().toISOString()
+        Date: new Date().toISOString(),
       });
 
       const flow = itemData.ApprovalMatrix
@@ -443,12 +483,10 @@ useEffect(() => {
 
       const currentUserId = context.pageContext.legacyPageContext.userId;
 
-      const currentIndex = flow.findIndex(
-        (a: any) => a.Id === currentUserId
-      );
+      const currentIndex = flow.findIndex((a: any) => a.Id === currentUserId);
 
       if (currentIndex !== -1) {
-        flow[currentIndex].Status = "Rejected";
+        flow[currentIndex].Status = "Reject";
       }
 
       await sp.web.lists
@@ -456,39 +494,49 @@ useEffect(() => {
         .items.getById(itemData.ID)
         .update({
           ApproverRemarks: approverRemarks,
-          Status: "Rejected",
+          Status: "Reject",
 
-         WorkflowHistory: JSON.stringify(history),
-         // ApprovalMatrix: JSON.stringify(flow),
+          CurrentApproverId: null,
+          PendingWth: "",
 
-       //   CurrentApproverId: itemData.CurrentApproverId
+          WorkflowHistory: JSON.stringify(history),
         });
 
-      alert("Rejected ❌");
-
-      window.location.href =
-        "https://isriglobal.sharepoint.com/sites/SonaFinance/SitePages/CapexPayment.aspx?page=Performer";
-
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Request rejected successfully.",
+        confirmButtonText: "OK",
+      });
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error(error);
-    }
-      finally { 
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while rejecting the request.",
+        confirmButtonText: "OK",
+      });
+    } finally {
       setIsSubmitting(false);
-  }
+    }
   };
 
   const handleExit = () => {
-    window.location.href = `https://isriglobal.sharepoint.com/sites/SonaFinance/SitePages/CapexPayment.aspx?page=Performer`;
+    if (onClose) {
+      onClose();
+    }
   };
 
-  // ⛔ Wait until data loads
   if (!itemData) return <div>Loading...</div>;
 
   return (
-    <div className='MainUplodForm' style={{ margin: "5px 0px" }}>
-      <div className='row'>
-        <div className='col-md-12'>
-          <div className='Main-Boxpoup'>
+    <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
+      <div className="row">
+        <div className="col-md-12">
+          <div className="Main-Boxpoup">
             <div className="bordered">
               <img src={logo} />
               <h1> Advance Payment (Approver) </h1>
@@ -509,8 +557,8 @@ useEffect(() => {
                           ? "active"
                           : a.Status === "Approved"
                             ? "approved"
-                            : a.Status === "Rejected"
-                              ? "rejected"
+                            : a.Status === "Reject"
+                              ? "reject"
                               : a.Status === "Send Back"
                                 ? "sendback"
                                 : ""
@@ -522,58 +570,88 @@ useEffect(() => {
                 </ul>
               </div>
             )}
-            <div className='borderedbox'>
+            <div className="borderedbox">
               <div className="heading1">
                 <label>Requestor Information</label>
               </div>
-              <div className='main-formcontainer'>
-                <div className='row mb-20'>
-                  <div className='col-md-4'>
-                    <label htmlFor="Employee Code" className='font'>Employee Code</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.EmployeeCode}</label>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label htmlFor="Employee Code" className="font">
+                      Employee Code
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.EmployeeCode}</label>
                   </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="Employee Name" className='font'>Employee Name </label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.EmployeeName}</label>
+                  <div className="col-md-4">
+                    <label htmlFor="Employee Name" className="font">
+                      Employee Name{" "}
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.EmployeeName}</label>
                   </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="Employee Email" className='font'>Employee Email </label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.Email}</label>
-                  </div>
-                </div>
-                <div className='row mb-20'>
-                  <div className='col-md-4'>
-                    <label htmlFor="Contact No" className='font'>Contact No</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.ContactNo}</label>
-                  </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="Employee Status" className='font'>Employee Status</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.EmployeeStatus}</label>
-                  </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="Division" className='font'>Division</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.Division}</label>
+                  <div className="col-md-4">
+                    <label htmlFor="Employee Email" className="font">
+                      Employee Email{" "}
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.Email}</label>
                   </div>
                 </div>
-                <div className='row mb-20'>
-                  <div className='col-md-4'>
-                    <label htmlFor="Location" className='font'>Location</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.Location}</label>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label htmlFor="Contact No" className="font">
+                      Contact No
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.ContactNo}</label>
                   </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="RM" className='font'>RM</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.RM}</label>
+                  <div className="col-md-4">
+                    <label htmlFor="Employee Status" className="font">
+                      Employee Status
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {" "}
+                      {itemData.EmployeeStatus}
+                    </label>
                   </div>
-                  <div className='col-md-4'>
-                    <label htmlFor="HOD" className='font'>HOD</label> : &nbsp;&nbsp;
-                    <label className='fonttext'>  {itemData.HOD}</label>
+                  <div className="col-md-4">
+                    <label htmlFor="Division" className="font">
+                      Division
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.Division}</label>
+                  </div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label htmlFor="Location" className="font">
+                      Location
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.Location}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label htmlFor="RM" className="font">
+                      RM
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.RM}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label htmlFor="HOD" className="font">
+                      HOD
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext"> {itemData.HOD}</label>
                   </div>
                 </div>
               </div>
               <div className="heading1">
                 <label>Vendor & PO Details</label>
               </div>
-               <div className="main-formcontainer">
+              <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font"> Vendor Code </label> : &nbsp;&nbsp;
@@ -591,11 +669,19 @@ useEffect(() => {
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">PO Date </label> : &nbsp;&nbsp;
-                    <label className="fonttext "> {itemData.PODate ? new Date(itemData.PODate).toLocaleDateString("en-GB",) : ""}</label>
+                    <label className="fonttext ">
+                      {" "}
+                      {itemData.PODate
+                        ? new Date(itemData.PODate).toLocaleDateString("en-GB")
+                        : ""}
+                    </label>
                   </div>
                   <div className="col-md-4">
                     <label className="font">PO Terms </label> : &nbsp;&nbsp;
-                    <label className="fonttext "> {itemData.POPaymentTerms}</label>
+                    <label className="fonttext ">
+                      {" "}
+                      {itemData.POPaymentTerms}
+                    </label>
                   </div>
                   <div className="col-md-4">
                     <label className="font">PO Amount </label> : &nbsp;&nbsp;
@@ -607,29 +693,40 @@ useEffect(() => {
               <div className="heading1">
                 <label>Approver Action</label>
               </div>
-              <div className='main-formcontainer'>
+              <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Approver Remarks</label>
-                     <input value={itemData.ApproverRemarks || ""} className="font-control readonly" />
+                    <input
+                      value={itemData.ApproverRemarks || ""}
+                      className="font-control readonly"
+                    />
                   </div>
                   <div className="col-md-4">
                     <label className="font">Voucher Date</label>
-                    <input value={itemData.VoucherDate
-                      ? new Date(itemData.VoucherDate).toLocaleDateString("en-GB") : ""}
-                      className="font-control readonly" />
+                    <input
+                      value={
+                        itemData.VoucherDate
+                          ? new Date(itemData.VoucherDate).toLocaleDateString(
+                              "en-GB",
+                            )
+                          : ""
+                      }
+                      className="font-control readonly"
+                    />
                   </div>
                   <div className="col-md-4">
                     <label className="font">Voucher Number</label>
-                    <input value={itemData.VoucherNumber || ""} className="font-control readonly" />
+                    <input
+                      value={itemData.VoucherNumber || ""}
+                      className="font-control readonly"
+                    />
                   </div>
                 </div>
               </div>
-
-                <div className="heading1" style={{ marginTop: "10px" }}>
+              <div className="heading1" style={{ marginTop: "10px" }}>
                 <label>MRN & Payment Details </label> : &nbsp;&nbsp;
               </div>
-
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
@@ -668,9 +765,9 @@ useEffect(() => {
               <div className="heading1">
                 <label>Upload Document</label>
               </div>
-              <div className='main-formcontainer'>
-                <div className='row mb-20'>
-                  <div className='col-md-4'>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-4">
                     <label className="font">Attachments</label>
                     {attachments.length === 0 ? (
                       <p>No attachments</p>
@@ -692,23 +789,34 @@ useEffect(() => {
                   </div>
                   <div className="col-md-4">
                     <label className="font">UTR Date</label>
-                    <input type="date" className="font-control" value={UTRDate}
+                    <input
+                      type="date"
+                      className="font-control"
+                      value={UTRDate}
                       max={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setUTRDate(e.target.value)} />
+                      onChange={(e) => setUTRDate(e.target.value)}
+                    />
                   </div>
                   <div className="col-md-4">
                     <label className="font">UTR Number</label>
-                    <input value={UTRNumber} className="font-control" onChange={(e) => setUTRNumber(e.target.value)} />
+                    <input
+                      value={UTRNumber}
+                      className="font-control"
+                      onChange={(e) => setUTRNumber(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">UTR Remarks</label>
-                    <input className="font-control" onChange={(e) => setUTRRemarks(e.target.value)} />
+                    <input
+                      className="font-control"
+                      onChange={(e) => setUTRRemarks(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>
-               <div className="heading1" style={{ marginTop: "10px" }}>
+              <div className="heading1" style={{ marginTop: "10px" }}>
                 <label>Workflow History</label>
               </div>
               <div className="main-formcontainer">
@@ -718,8 +826,6 @@ useEffect(() => {
                       <p>No history available</p>
                     ) : (
                       <div className="workflow-history">
-                        
-
                         <table
                           className="workflow-table"
                           style={{ width: "100%" }}
@@ -745,7 +851,8 @@ useEffect(() => {
                               .filter(
                                 (h: any) =>
                                   h.ActionTaken &&
-                                  h.ActionTaken !== "Draft Saved" && h.ActionTaken !== "Edited",
+                                  h.ActionTaken !== "Draft Saved" &&
+                                  h.ActionTaken !== "Edited",
                               )
                               .map((h: any, idx: number) => (
                                 <tr key={idx}>
@@ -772,35 +879,41 @@ useEffect(() => {
                               ))}
                           </tbody>
                         </table>
-                       
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-              <div className='row my-3'>
-                <div className='col-md-12'>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-                   <a
-                          className={`submit-btn ${isSubmitting ? "disabled-btn" : ""}`}
-                          onClick={!isSubmitting ? handleApprove : undefined}
-                        >
-                          {isSubmitting ? "Processing..." : "Paid"}
-                        </a>
+              <div className="row my-3">
+                <div className="col-md-12">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "5px",
+                    }}
+                  >
+                    <a
+                      className={`submit-btn ${isSubmitting ? "disabled-btn" : ""}`}
+                      onClick={!isSubmitting ? handleApprove : undefined}
+                    >
+                      {isSubmitting ? "Processing..." : "Paid"}
+                    </a>
 
-                        <a
-                          className={`Rework-btn ${isSubmitting ? "disabled-btn" : ""}`}
-                          onClick={!isSubmitting ? handleSendBack : undefined}
-                        >
-                          {isSubmitting ? "Processing..." : "Send Back"}
-                        </a>
+                    <a
+                      className={`Rework-btn ${isSubmitting ? "disabled-btn" : ""}`}
+                      onClick={!isSubmitting ? handleSendBack : undefined}
+                    >
+                      {isSubmitting ? "Processing..." : "Send Back"}
+                    </a>
 
-                        <a
-                          className={`Reject-btn ${isSubmitting ? "disabled-btn" : ""}`}
-                          onClick={!isSubmitting ? handleReject : undefined}
-                        >
-                          {isSubmitting ? "Processing..." : "Reject"}
-                        </a>
+                    <a
+                      className={`Reject-btn ${isSubmitting ? "disabled-btn" : ""}`}
+                      onClick={!isSubmitting ? handleReject : undefined}
+                    >
+                      {isSubmitting ? "Processing..." : "Reject"}
+                    </a>
                     <a href="#" onClick={handleExit} className="reset-btn">
                       Exit
                     </a>
@@ -811,7 +924,7 @@ useEffect(() => {
           </div>
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 

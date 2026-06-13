@@ -7,7 +7,6 @@ import APperformerAdvanceform from "./APperformerAdvanceform";
 import logo from "../assets/SonaPNGLogo.png";
 import Edit from "../assets/Pencil.png";
 import User from "../assets/Userlogo.png";
-//import "../assets/bootstrap/css/bootstrap.css";
 import View from "../assets/Eye.png";
 import ViewAdvanceForm from "./ViewAdvanceForm";
 import { spfi } from "@pnp/sp";
@@ -19,15 +18,11 @@ interface UserDashboardProps {
 
 const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const sp = spfi().using(SPFx(context));
-  //const [formType, setFormType] = useState<"new" | "view" | null>(null);
-  //const [formType, setFormType] = useState<"new" | "view" | "approve" | null>(null);
-
   const [formType, setFormType] = useState<
     "approve" | "approveUTR" | "view" | null
   >(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
 
   const [activeMenu, setActiveMenu] = React.useState("My Request");
   const [searchText, setSearchText] = React.useState("");
@@ -37,7 +32,6 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const [currentUserName, setCurrentUserName] = React.useState("");
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
 
-  // const username = props.userDisplayName;
   const handleFormOpen = async (
     item: any,
     type: "view" | "approve" | "approveUTR",
@@ -58,54 +52,48 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           "Location",
           "ContactNo",
           "EmployeeStatus",
-
           "RM",
           "HOD",
-
           "CapexId",
           "VendorName",
           "VendorCode",
-
           "PONumber",
           "PODate",
           "POAmount",
           "POPaymentTerms",
-
           "MRNNumber",
           "MRNDtae",
           "MRNAmountwithGST",
-
           "RequestedAmountforPayment",
           "VoucherNumber",
           "VoucherDate",
           "ApproverRemarks",
           "FinalPaymentAgainstPO",
           "InstallationDetails",
-
           "Status",
           "Author/EMail",
         )
         .expand("Author")();
 
-      // ✅ Map SharePoint fields to UI fields
       const mappedData = {
         ...fullItem,
         EmployeeEmail: fullItem.EmployeeEmail,
         POAmtGST: fullItem.POAmount,
         POAdvanceTerms: fullItem.POPaymentTerms,
-
         mrnNumber: fullItem.MRNNumber,
         mrnDate: fullItem.MRNDtae,
         mrnAmount: fullItem.MRNAmountwithGST,
-
         requestedAmount: fullItem.RequestedAmountforPayment,
-
         finalPayment: fullItem.FinalPaymentAgainstPO,
         installationDetails: fullItem.InstallationDetails,
         ReportingManager: fullItem.ReportingManager,
         HOD: fullItem.HOD,
-        ApprovalMatrix: fullItem.ApprovalMatrix ? JSON.parse(fullItem.ApprovalMatrix) : null,
-        WorkflowHistory: fullItem.WorkflowHistory ? JSON.parse(fullItem.WorkflowHistory) : null,
+        ApprovalMatrix: fullItem.ApprovalMatrix
+          ? JSON.parse(fullItem.ApprovalMatrix)
+          : null,
+        WorkflowHistory: fullItem.WorkflowHistory
+          ? JSON.parse(fullItem.WorkflowHistory)
+          : null,
       };
 
       setSelectedItem(mappedData);
@@ -115,7 +103,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       console.error("Form open error:", error);
     }
   };
-  // ✅ GET CURRENT USER
+
   const getLoggedInUser = async () => {
     try {
       const user = await sp.web.currentUser();
@@ -126,40 +114,35 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   };
 
   const handleApproveClick = async (item: any) => {
-  debugger;
+    debugger;
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
+        .select("*", "Author/EMail")
+        .expand("Author")();
 
       setSelectedItem(fullItem);
-       if (item.status === "Pending for PF Approver") {
+
+      if (item.status === "Pending for Vouching Update") {
         setFormType("approve");
-      } else if (item.status === "Pending for PF Approver UTR") {
+      } else if (item.status === "Pending for UTR Update") {
         setFormType("approveUTR");
       }
 
-      //setFormType("approve");
       setShowForm(true);
     } catch (error) {
       console.error("View error:", error);
     }
   };
+
   const handleViewClick = async (item: any) => {
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
+        .select("*", "Author/EMail")
+        .expand("Author")();
 
       setSelectedItem(fullItem);
       setFormType("view");
@@ -168,64 +151,39 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       console.error("View error:", error);
     }
   };
-  // const handleViewClick = async (item: any) => {
-  //   try {
-  //     debugger;
-  //     const fullItem = await sp.web.lists
-  //       .getByTitle("CapexPayment")
-  //       .items.getById(item.ID)
-  //       .select("*", "PICName/Title")
-  //       .expand("PICName")();
 
-  //     setSelectedItem(fullItem);
-      
-  //     setShowForm(true);
-  //   } catch (error) {
-  //     console.error("View error:", error);
-  //   }
-  // };
-  // const handleApproveClick = async (item: any) => {
-  //   try {
-  //     const fullItem = await sp.web.lists
-  //       .getByTitle("CapexPayment")
-  //       .items.getById(item.ID)
-  //       .select("*", "PICName/Title")
-  //       .expand("PICName")();
-
-  //     setSelectedItem(fullItem);
-
-  //     // 🔥 CONDITION BASED ROUTING
-  //     if (item.status === "Pending for PF Approver") {
-  //       setFormType("approve");
-  //     } else if (item.status === "Pending for PF Approver UTR") {
-  //       setFormType("approveUTR");
-  //     }
-
-  //     setShowForm(true);
-  //   } catch (error) {
-  //     console.error("Approve error:", error);
-  //   }
-  // };
   const getCapexData = async () => {
     try {
       const currentUser = await sp.web.currentUser();
       let filterQuery;
-      // const currentUser = await sp.web.currentUser();
 
-     if (activeMenu === "My Request") {
+      if (activeMenu === "My Request") {
         filterQuery = `
-      (
-        Status eq 'Pending for PF Approver'
-        or Status eq 'Pending for PF Approver UTR'
-      )
-      and CurrentApprover/Id eq ${currentUser.Id}
-      `;
+    (
+      Status eq 'Pending for Vouching Update'
+      or Status eq 'Pending for UTR Update'
+    )
+    and CurrentApproverId eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "")
+          .trim();
       } else if (activeMenu === "Paid") {
-        filterQuery = `Status eq 'Paid'`;
+        filterQuery = `
+    Status eq 'Paid'
+    and Author/Id eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "")
+          .trim();
       } else if (activeMenu === "Rejected") {
-        filterQuery = `Status eq 'Rejected'`;
+        filterQuery = `
+    Status eq 'Reject'
+    and Author/Id eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "")
+          .trim();
       }
-       const items = await sp.web.lists
+
+      const items = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.select(
           "*",
@@ -238,9 +196,13 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           "PONumber",
           "RequestedAmountforPayment",
           "Status",
-          "Author/EMail", // 🔥 needed for My Request
+          "CurrentApproverId",
+          "CurrentApprover/Title",
+          "CurrentApprover/EMail",
+          "PendingWth",
+          "Author/EMail",
         )
-        .expand("Author") // ✅ correct expand
+        .expand("Author", "CurrentApprover")
         .filter(filterQuery)
         .orderBy("ID", false)();
 
@@ -255,7 +217,8 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         vendorCode: item.VendorCode || "",
         po: item.PONumber || "",
         amount: item.RequestedAmountforPayment || 0,
-        status: item.Status || "", // ✅ FIXED
+        pendingWith: item.CurrentApprover?.Title || item.PendingWth || "",
+        status: item.Status || "",
       }));
 
       setData(formatted);
@@ -269,11 +232,10 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     const status = statusFilter.toLowerCase();
 
     let menuFilter = true;
-
     if (activeMenu === "Paid") {
       menuFilter = item.status?.toLowerCase() === "paid";
     } else if (activeMenu === "Rejected") {
-      menuFilter = item.status?.toLowerCase() === "rejected";
+      menuFilter = item.status?.toLowerCase() === "reject";
     } else if (activeMenu === "My Request") {
       menuFilter = true;
     }
@@ -288,26 +250,22 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   });
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-
   const paginatedData = filteredData.slice(startIndex, endIndex);
+
   React.useEffect(() => {
-  if (!context) return;
+    if (!context) return;
+    void getLoggedInUser();
+    void getCapexData();
+  }, [context, activeMenu]);
 
-  void getLoggedInUser();
-  void getCapexData();
-
-}, [context, activeMenu]);
-
-   if (showForm) {
+  if (showForm) {
     if (formType === "approve") {
       return (
         <APperformerAdvanceform context={context} itemId={selectedItem?.ID} />
       );
     }
-
     if (formType === "approveUTR") {
       return (
         <APperformerAdvanceFormForUTR
@@ -316,7 +274,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         />
       );
     }
-     if (formType === "view") {
+    if (formType === "view") {
       return (
         <ViewAdvanceForm
           context={context}
@@ -355,7 +313,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           <li className="nav-item">
             <a
               className={
-                activeMenu === "My Request" ? " nav-link active" : "nav-link"
+                activeMenu === "My Request" ? "nav-link active" : "nav-link"
               }
               onClick={() => setActiveMenu("My Request")}
               style={{ cursor: "pointer" }}
@@ -365,9 +323,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           </li>
           <li className="nav-item">
             <a
-              className={
-                activeMenu === "Paid" ? " nav-link  active" : "nav-link"
-              }
+              className={activeMenu === "Paid" ? "nav-link active" : "nav-link"}
               onClick={() => setActiveMenu("Paid")}
               style={{ cursor: "pointer" }}
             >
@@ -377,7 +333,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           <li className="nav-item">
             <a
               className={
-                activeMenu === "Rejected" ? "nav-link  active" : "nav-link"
+                activeMenu === "Rejected" ? "nav-link active" : "nav-link"
               }
               onClick={() => setActiveMenu("Rejected")}
               style={{ cursor: "pointer" }}
@@ -387,6 +343,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           </li>
         </ul>
       </div>
+
       <div
         className="main"
         style={{ width: "calc(100% - 250px)", transition: "width 0.3s" }}
@@ -394,17 +351,18 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         <div className="header">
           <div className="left-banner">
             <div className="logo-text">
-              <h2> Capex Payment Performer Dashboard </h2>
+              <h2>Capex Payment Performer Dashboard</h2>
             </div>
           </div>
         </div>
+
         <div className="col-md-12 mainsecond">
           <div>
             <input
               placeholder="Search"
               value={searchText}
               className="form-control"
-              style={{ width: "250px;" }}
+              style={{ width: "250px" }}
               onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
@@ -415,13 +373,22 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="">All</option>
-              <option value="Submitted">Submitted</option>
+              <option value="Pending for Approval">Pending for Approval</option>
               <option value="Approved">Approved</option>
               <option value="Rejected">Rejected</option>
+              <option value="Send Back">Send Back</option>
               <option value="Draft">Draft</option>
+              <option value="Pending for Vouching Update">
+                Pending for Vouching Update
+              </option>
+              <option value="Paid">Paid</option>
+              <option value="Pending for UTR Update">
+                Pending for UTR Update
+              </option>
             </select>
           </div>
         </div>
+
         <main className="Main-Dash mx-2">
           <div style={{ overflowX: "auto" }}>
             <div className="table-vert-scroll">
@@ -440,23 +407,21 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                     <th className="px-4 py-2">Vendor Name</th>
                     <th className="px-4 py-2">PO Number</th>
                     <th className="px-4 py-2">Request Amount</th>
-
                     <th className="px-4 py-2">Pending With</th>
                     <th className="px-4 py-2">Status</th>
-                    
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.length === 0 ? (
+                  {paginatedData.length === 0 ? (
                     <tr>
                       <td colSpan={11} style={{ textAlign: "center" }}>
                         No Data
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((item, i) => (
+                    paginatedData.map((item, i) => (
                       <tr key={i}>
-                         <td className="px-4 py-2">
+                        <td className="px-4 py-2">
                           {(activeMenu === "Paid" ||
                             activeMenu === "Rejected") && (
                             <span
@@ -466,11 +431,9 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                               <img src={View} width={15} alt="View" />
                             </span>
                           )}
-
                           {activeMenu === "My Request" &&
-                            (item.status === "Pending for PF Approver" ||
-                              item.status ===
-                                "Pending for PF Approver UTR") && (
+                            (item.status === "Pending for Vouching Update" ||
+                              item.status === "Pending for UTR Update") && (
                               <span
                                 onClick={() => handleApproveClick(item)}
                                 style={{ cursor: "pointer" }}
@@ -479,69 +442,47 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                               </span>
                             )}
                         </td>
-                        {/* <td className="px-4 py-2">
-                          {(item.status === "Pending for PF Approver" ||
-                            item.status === "Pending for PF Approver UTR") && (
-                              <span
-                                onClick={() => {
-                                  if (item.status === "Pending for PF Approver") {
-                                    handleFormOpen(item, "approve");
-                                  } else if (
-                                    item.status === "Pending for PF Approver UTR"
-                                  ) {
-                                    handleFormOpen(item, "approveUTR");
-                                  }
-                                }}
-                                style={{ cursor: "pointer" }}
-                              >
-                                <img src={Edit} width={15} alt="Action" />
-                              </span>
-                            )}
-                        </td> */}
                         <td className="px-4 py-2">{item.id}</td>
                         <td className="px-4 py-2">{item.date}</td>
                         <td className="px-4 py-2">{item.EmployeeName}</td>
                         <td className="px-4 py-2">Capex Payment</td>
-                        <td className="px-4 py-2"> {item.vendorCode}</td>
+                        <td className="px-4 py-2">{item.vendorCode}</td>
                         <td className="px-4 py-2">{item.vendor}</td>
                         <td className="px-4 py-2">{item.po}</td>
                         <td className="px-4 py-2">₹ {item.amount}</td>
-
-                        <td className="px-4 py-2">Approver</td>
+                        <td className="px-4 py-2">{item.pendingWith || "-"}</td>
                         <td className="px-4 py-2">{item.status}</td>
-                        
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
-               <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginTop: "15px",
-                  }}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginTop: "15px",
+                }}
+              >
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
                 >
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    Previous
-                  </button>
-
-                  <span>
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <button
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </main>

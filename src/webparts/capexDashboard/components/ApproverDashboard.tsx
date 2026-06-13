@@ -17,13 +17,11 @@ interface UserDashboardProps {
 
 const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const sp = spfi().using(SPFx(context));
-  //const [formType, setFormType] = useState<"new" | "view" | null>(null);
   const [formType, setFormType] = useState<"new" | "view" | "approve" | null>(
     null,
   );
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
 
   const [activeMenu, setActiveMenu] = React.useState("My Request");
   const [searchText, setSearchText] = React.useState("");
@@ -33,7 +31,6 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const [currentUserName, setCurrentUserName] = React.useState("");
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
 
-  // ✅ GET CURRENT USER
   const getLoggedInUser = async () => {
     try {
       const user = await sp.web.currentUser();
@@ -42,72 +39,63 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       console.error("User error:", error);
     }
   };
+
   const handleFormOpen = async (item: any, type: "view" | "approve") => {
     try {
       debugger;
       const fullItem = await sp.web.lists
-  .getByTitle("CapexPayment")
-  .items.getById(item.ID)
-  .select(
-    "*",
-    "ID",
-    "Title",
-    "EmployeeCode",
-    "EmployeeName",
-    "Email",
-    "Division",
-    "Location",
-    "ContactNo",
-    "EmployeeStatus",
+        .getByTitle("CapexPayment")
+        .items.getById(item.ID)
+        .select(
+          "*",
+          "ID",
+          "Title",
+          "EmployeeCode",
+          "EmployeeName",
+          "Email",
+          "Division",
+          "Location",
+          "ContactNo",
+          "EmployeeStatus",
+          "RM",
+          "HOD",
+          "CapexId",
+          "VendorName",
+          "VendorCode",
+          "PONumber",
+          "PODate",
+          "POAmount",
+          "POPaymentTerms",
+          "MRNNumber",
+          "MRNDtae",
+          "MRNAmountwithGST",
+          "RequestedAmountforPayment",
+          "FinalPaymentAgainstPO",
+          "InstallationDetails",
+          "Status",
+          "Author/EMail",
+        )
+        .expand("Author")();
 
-    "RM",
-    "HOD",
-
-    "CapexId",
-    "VendorName",
-    "VendorCode",
-
-    "PONumber",
-    "PODate",
-    "POAmount",
-    "POPaymentTerms",
-
-    "MRNNumber",
-    "MRNDtae",
-    "MRNAmountwithGST",
-
-    "RequestedAmountforPayment",
-
-    "FinalPaymentAgainstPO",
-    "InstallationDetails",
-    
-
-    "Status",
-    "Author/EMail"
-
-  )
-  .expand("Author")();
-
-
-      // ✅ Map SharePoint fields to UI fields
       const mappedData = {
         ...fullItem,
         EmployeeEmail: fullItem.EmployeeEmail,
         POAmtGST: fullItem.POAmount,
         POAdvanceTerms: fullItem.POPaymentTerms,
-
         mrnNumber: fullItem.MRNNumber,
         mrnDate: fullItem.MRNDtae,
         mrnAmount: fullItem.MRNAmountwithGST,
-
         requestedAmount: fullItem.RequestedAmountforPayment,
-
         finalPayment: fullItem.FinalPaymentAgainstPO,
         installationDetails: fullItem.InstallationDetails,
         ReportingManager: fullItem.ReportingManager,
         HOD: fullItem.HOD,
-        ApprovalMatrix: fullItem.ApprovalMatrix ? JSON.parse(fullItem.ApprovalMatrix) : null,
-        WorkflowHistory: fullItem.WorkflowHistory ? JSON.parse(fullItem.WorkflowHistory) : null,  
+        ApprovalMatrix: fullItem.ApprovalMatrix
+          ? JSON.parse(fullItem.ApprovalMatrix)
+          : null,
+        WorkflowHistory: fullItem.WorkflowHistory
+          ? JSON.parse(fullItem.WorkflowHistory)
+          : null,
       };
 
       setSelectedItem(mappedData);
@@ -117,17 +105,15 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       console.error("Form open error:", error);
     }
   };
-const handleApproveClick = async (item: any) => {
-  debugger;
+
+  const handleApproveClick = async (item: any) => {
+    debugger;
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
+        .select("*", "Author/EMail")
+        .expand("Author")();
 
       setSelectedItem(fullItem);
       setFormType("approve");
@@ -136,16 +122,14 @@ const handleApproveClick = async (item: any) => {
       console.error("View error:", error);
     }
   };
+
   const handleViewClick = async (item: any) => {
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
+        .select("*", "Author/EMail")
+        .expand("Author")();
 
       setSelectedItem(fullItem);
       setFormType("view");
@@ -154,108 +138,88 @@ const handleApproveClick = async (item: any) => {
       console.error("View error:", error);
     }
   };
-  // ✅ GET LIST DATA
-  
+//GetData 
+  const getCapexData = async () => {
+    try {
+      const currentUser = await sp.web.currentUser();
+      let filterQuery = "";
 
+      if (activeMenu === "My Request") {
+        filterQuery = `
+    Status eq 'Pending for Approval'
+    and CurrentApproverId eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "") 
+          .trim();
+      } else if (activeMenu === "Paid") {
+        filterQuery = `
+    Status eq 'Paid'
+    and CurrentApproverId eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "")
+          .trim();
+      } else if (activeMenu === "Rejected") {
+        filterQuery = `
+    Status eq 'Reject'
+    and CurrentApproverId eq ${currentUser.Id}
+  `
+          .replace(/\n/g, "")
+          .trim();
+      }
 
+      const items = await sp.web.lists
+        .getByTitle("CapexPayment")
+        .items.select(
+          "*",
+          "ID",
+          "Title",
+          "Created",
+          "EmployeeName",
+          "VendorName",
+          "VendorCode",
+          "PONumber",
+          "RequestedAmountforPayment",
+          "Status",
+          "CurrentApproverId",
+          "CurrentApprover/Title",
+          "CurrentApprover/EMail",
+          "PendingWth",
+          "Author/EMail",
+        )
+        .expand("Author", "CurrentApprover")
+        .filter(filterQuery)
+        .orderBy("ID", false)();
 
-const getCapexData = async () => {
+      const formatted = items.map((item: any) => ({
+        ID: item.ID,
+        id: item.Title,
+        date: item.Created
+          ? new Date(item.Created).toLocaleDateString("en-GB")
+          : "",
+        EmployeeName: item.EmployeeName || "",
+        vendor: item.VendorName || "",
+        vendorCode: item.VendorCode || "",
+        po: item.PONumber || "",
+        amount: item.RequestedAmountforPayment || 0,
+        pendingWith: item.CurrentApprover?.Title || item.PendingWth || "",
+        status: item.Status || "",
+      }));
 
-  try {
-
-    let filterQuery = "";
-
-    const currentUser = await sp.web.currentUser();
-
-    // =========================
-    // 🔥 MY REQUEST
-    // =========================
-    if (activeMenu === "My Request") {
-
-     filterQuery = `Status eq 'Pending for Approver'`;
+      setData(formatted);
+    } catch (error) {
+      console.error("Data error:", error);
     }
+  };
 
-    // =========================
-    // 🔥 PAID
-    // =========================
-    else if (activeMenu === "Paid") {
-
-      filterQuery = "Status eq 'Paid'";
-    }
-
-    // =========================
-    // 🔥 REJECTED
-    // =========================
-    else if (activeMenu === "Rejected") {
-
-      filterQuery = "Status eq 'Rejected'";
-    }
-
-    const items = await sp.web.lists
-      .getByTitle("CapexPayment")
-      .items.select(
-        "*",
-        "ID",
-        "Title",
-        "Created",
-        "EmployeeName",
-        "VendorName",
-        "VendorCode",
-        "PONumber",
-        "RequestedAmountforPayment",
-        "Status",
-        "CurrentApproverId",
-        "Author/EMail"
-      )
-      .expand("Author")
-      .filter(filterQuery)
-      .orderBy("ID", false)();
-
-    const formatted = items.map((item: any) => ({
-
-      ID: item.ID,
-
-      id: item.Title,
-
-      date: item.Created
-        ? new Date(item.Created).toLocaleDateString("en-GB")
-        : "",
-
-      EmployeeName: item.EmployeeName || "",
-
-      vendor: item.VendorName || "",
-
-      vendorCode: item.VendorCode || "",
-
-      po: item.PONumber || "",
-
-      amount: item.RequestedAmountforPayment || 0,
-
-      status: item.Status || "",
-
-    }));
-
-    setData(formatted);
-
-  } catch (error) {
-
-    console.error("Data error:", error);
-  }
-};
-
-  // ✅ VIEW CLICK
-
-  // ✅ FILTER
   const filteredData = data.filter((item) => {
     const text = searchText.toLowerCase();
     const status = statusFilter.toLowerCase();
 
     let menuFilter = true;
-
     if (activeMenu === "Paid") {
       menuFilter = item.status?.toLowerCase() === "paid";
     } else if (activeMenu === "Rejected") {
-      menuFilter = item.status?.toLowerCase() === "rejected";
+      menuFilter = item.status?.toLowerCase() === "reject";
     } else if (activeMenu === "My Request") {
       menuFilter = true;
     }
@@ -268,35 +232,29 @@ const getCapexData = async () => {
       (!status || item.status?.toLowerCase().includes(status))
     );
   });
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-
   const paginatedData = filteredData.slice(startIndex, endIndex);
-React.useEffect(() => {
-  if (!context) return;
-  void getLoggedInUser();
-}, [context]);
 
-React.useEffect(() => {
-  if (!context) return;
-  void getCapexData();
-}, [context, activeMenu]);
- 
+  React.useEffect(() => {
+    if (!context) return;
+    void getLoggedInUser();
+  }, [context]);
 
-  // ✅ OPEN VIEW PAGE
- if (showForm) {
-   if (formType === "approve") {
+  React.useEffect(() => {
+    if (!context) return;
+    void getCapexData();
+  }, [context, activeMenu]);
+
+  if (showForm) {
+    if (formType === "approve") {
       return (
-        <ApproverAdvanceForm
-          context={context}
-          itemId={selectedItem?.ID}
-          
-        />
+        <ApproverAdvanceForm context={context} itemId={selectedItem?.ID} />
       );
     }
-     if (formType === "view") {
+    if (formType === "view") {
       return (
         <ViewAdvanceForm
           context={context}
@@ -309,21 +267,7 @@ React.useEffect(() => {
         />
       );
     }
-  
-
-   
   }
-  // if (showForm && selectedItem) {
-  //   return (
-
-      
-  //     <ApproverAdvanceForm
-  //       context={context}
-  //       formData={selectedItem}
-  //       onClose={() => setShowForm(false)}
-  //     />
-  //   );
-  // }
 
   return (
     <>
@@ -350,7 +294,7 @@ React.useEffect(() => {
             <li className="nav-item">
               <a
                 className={
-                  activeMenu === "My Request" ? " nav-link active" : "nav-link"
+                  activeMenu === "My Request" ? "nav-link active" : "nav-link"
                 }
                 onClick={() => setActiveMenu("My Request")}
                 style={{ cursor: "pointer" }}
@@ -361,7 +305,7 @@ React.useEffect(() => {
             <li className="nav-item">
               <a
                 className={
-                  activeMenu === "Paid" ? " nav-link  active" : "nav-link"
+                  activeMenu === "Paid" ? "nav-link active" : "nav-link"
                 }
                 onClick={() => setActiveMenu("Paid")}
                 style={{ cursor: "pointer" }}
@@ -372,7 +316,7 @@ React.useEffect(() => {
             <li className="nav-item">
               <a
                 className={
-                  activeMenu === "Rejected" ? "nav-link  active" : "nav-link"
+                  activeMenu === "Rejected" ? "nav-link active" : "nav-link"
                 }
                 onClick={() => setActiveMenu("Rejected")}
                 style={{ cursor: "pointer" }}
@@ -382,6 +326,7 @@ React.useEffect(() => {
             </li>
           </ul>
         </div>
+
         <div
           className="main"
           style={{ width: "calc(100% - 250px)", transition: "width 0.3s" }}
@@ -389,17 +334,18 @@ React.useEffect(() => {
           <div className="header">
             <div className="left-banner">
               <div className="logo-text">
-                <h2> CAPEX Payment Approver Dashboard </h2>
+                <h2>CAPEX Payment Approver Dashboard</h2>
               </div>
             </div>
           </div>
+
           <div className="col-md-12 mainsecond">
             <div>
               <input
                 placeholder="Search"
                 value={searchText}
                 className="form-control"
-                style={{ width: "250px;" }}
+                style={{ width: "250px" }}
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
@@ -410,13 +356,24 @@ React.useEffect(() => {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">All</option>
-                <option value="Submitted">Submitted</option>
+                <option value="Pending for Approval">
+                  Pending for Approval
+                </option>
                 <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
+                <option value="Send Back">Send Back</option>
                 <option value="Draft">Draft</option>
+                <option value="Pending for Vouching Update">
+                  Pending for Vouching Update
+                </option>
+                <option value="Paid">Paid</option>
+                <option value="Pending for UTR Update">
+                  Pending for UTR Update
+                </option>
               </select>
             </div>
           </div>
+
           <main className="Main-Dash mx-2">
             <div style={{ overflowX: "auto" }}>
               <div className="table-vert-scroll">
@@ -435,21 +392,19 @@ React.useEffect(() => {
                       <th className="px-4 py-2">Vendor Name</th>
                       <th className="px-4 py-2">PO Number</th>
                       <th className="px-4 py-2">Request Amount</th>
-                      
                       <th className="px-4 py-2">Pending With</th>
                       <th className="px-4 py-2">Status</th>
-                      
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredData.length === 0 ? (
+                    {paginatedData.length === 0 ? (
                       <tr>
                         <td colSpan={11} style={{ textAlign: "center" }}>
                           No Data
                         </td>
                       </tr>
                     ) : (
-                      filteredData.map((item, i) => (
+                      paginatedData.map((item, i) => (
                         <tr key={i}>
                           <td className="px-4 py-2">
                             {(activeMenu === "Paid" ||
@@ -464,36 +419,34 @@ React.useEffect(() => {
                                 <img src={View} width={15} alt="View" />
                               </span>
                             )}
-
-                            {activeMenu === "My Request" &&
-                              
-                                <span
-                                  onClick={() => handleApproveClick(item)}
-                                  style={{ cursor: "pointer" }}
-                                >
-                                  <img src={Edit} width={15} alt="Edit" />
-                                </span>
-                              }
+                            {activeMenu === "My Request" && (
+                              <span
+                                onClick={() => handleApproveClick(item)}
+                                style={{ cursor: "pointer" }}
+                              >
+                                <img src={Edit} width={15} alt="Edit" />
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-2">{item.id}</td>
                           <td className="px-4 py-2">{item.date}</td>
                           <td className="px-4 py-2">{item.EmployeeName}</td>
                           <td className="px-4 py-2">Capex Payment</td>
-                          <td className="px-4 py-2"> {item.vendorCode}</td>
+                          <td className="px-4 py-2">{item.vendorCode}</td>
                           <td className="px-4 py-2">{item.vendor}</td>
                           <td className="px-4 py-2">{item.po}</td>
                           <td className="px-4 py-2">₹ {item.amount}</td>
-                         
-                          <td className="px-4 py-2">Approver</td>
-
+                          <td className="px-4 py-2">
+                            {item.pendingWith || "-"}
+                          </td>{" "}
                           <td className="px-4 py-2">{item.status}</td>
-                          
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
-                 <div
+
+                <div
                   style={{
                     display: "flex",
                     justifyContent: "center",
@@ -508,11 +461,9 @@ React.useEffect(() => {
                   >
                     Previous
                   </button>
-
                   <span>
-                    Page {currentPage} of {totalPages}
+                    Page {currentPage} of {totalPages || 1}
                   </span>
-
                   <button
                     disabled={currentPage === totalPages || totalPages === 0}
                     onClick={() => setCurrentPage(currentPage + 1)}

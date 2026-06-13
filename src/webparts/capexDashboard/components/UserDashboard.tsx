@@ -23,7 +23,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const [formType, setFormType] = useState<"view" | "new" | "Edit" | null>(
     null,
   );
-const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const [activeMenu, setActiveMenu] = React.useState("My Request");
@@ -34,7 +34,6 @@ const [currentPage, setCurrentPage] = useState(1);
   const [currentUserName, setCurrentUserName] = React.useState("");
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
 
-  // ✅ GET CURRENT USER
   const getLoggedInUser = async () => {
     try {
       const user = await sp.web.currentUser();
@@ -43,137 +42,89 @@ const [currentPage, setCurrentPage] = useState(1);
       console.error("User error:", error);
     }
   };
+
   const getCapexData = async () => {
     try {
       const currentUser = await sp.web.currentUser();
-
       let filterQuery = `Author/Id eq ${currentUser.Id}`;
 
-      
       if (activeMenu === "My Request") {
+        // Exclude Paid and Rejected from My Request tab
         filterQuery = `
-        Author/Id eq ${currentUser.Id}
-        and Status ne 'Paid'
-        and Status ne 'Rejected'
-      `
+          Author/Id eq ${currentUser.Id}
+          and Status ne 'Paid'
+          and Status ne 'Reject'
+        `
+          .replace(/\n/g, "")
+          .trim();
+      } else if (activeMenu === "Paid") {
+        filterQuery = `
+          Author/Id eq ${currentUser.Id}
+          and Status eq 'Paid'
+        `
+          .replace(/\n/g, "")
+          .trim();
+      } else if (activeMenu === "Rejected") {
+        filterQuery = `
+          Author/Id eq ${currentUser.Id}
+          and Status eq 'Reject'
+        `
           .replace(/\n/g, "")
           .trim();
       }
-
-      
-      else if (activeMenu === "Paid") {
-        filterQuery = `
-        Author/Id eq ${currentUser.Id}
-        and Status eq 'Paid'
-      `
-          .replace(/\n/g, "")
-          .trim();
-      }
-
-      
-      else if (activeMenu === "Rejected") {
-        filterQuery = `
-        Author/Id eq ${currentUser.Id}
-        and Status eq 'Rejected'
-      `
-          .replace(/\n/g, "")
-          .trim();
-      }
-
-      console.log("Filter Query:", filterQuery);
-
-      // const items = await sp.web.lists
-      //   .getByTitle("CapexPayment")
-      //   .items.select(
-      //     "ID",
-      //     "Title",
-      //     "Created",
-      //     "EmployeeName",
-      //     "VendorName",
-      //     //"VendorCode/Id",
-      //     //"VendorCode/VendorCode",
-      //     "PONumber",
-      //     "RequestedAmountforPayment",
-      //     "Status",
-      //     "Author/Id",
-      //   )
-      //   .expand( "Author")
-      //   .filter(filterQuery)
-      //   .orderBy("ID", false)();
-
-      // const formatted = items.map((item: any) => ({
-      //   ID: item.ID,
-      //   id: item.Title,
-      //   date: item.Created
-      //     ? new Date(item.Created).toLocaleDateString("en-GB")
-      //     : "",
-      //   EmployeeName: item.EmployeeName,
-      //   vendor: item.VendorName || "",
-      //  // vendorCode: item.VendorCode?.VendorCode || "",
-      //   po: item.PONumber || "",
-      //   amount: item.RequestedAmountforPayment || 0,
-      //   status: item.Status || "",
-      // }));
 
       const items = await sp.web.lists
-      .getByTitle("CapexPayment")
-      .items.select(
-        "*",
-        "ID",
-        "Title",
-        "Created",
-        "EmployeeName",
-        "VendorName",
-        "VendorCode",
-        "PONumber",
-        "RequestedAmountforPayment",
-        "Status",
-        "CurrentApproverId",
-        "Author/EMail"
-      )
-      .expand("Author")
-      .filter(filterQuery)
-      .orderBy("ID", false)();
+        .getByTitle("CapexPayment")
+        .items.select(
+          "*",
+          "ID",
+          "Title",
+          "Created",
+          "EmployeeName",
+          "VendorName",
+          "VendorCode",
+          "PONumber",
+          "RequestedAmountforPayment",
+          "Status",
+          "CurrentApprover/Title",
+          "CurrentApprover/EMail",
+          "CurrentApproverId",
+          "Author/EMail",
+        )
+        .expand("Author", "CurrentApprover")
+        .filter(filterQuery)
+        .orderBy("ID", false)();
 
-    const formatted = items.map((item: any) => ({
-
-      ID: item.ID,
-
-      id: item.Title,
-
-      date: item.Created
-        ? new Date(item.Created).toLocaleDateString("en-GB")
-        : "",
-
-      EmployeeName: item.EmployeeName || "",
-
-      vendor: item.VendorName || "",
-
-      vendorCode: item.VendorCode || "",
-
-      po: item.PONumber || "",
-
-      amount: item.RequestedAmountforPayment || 0,
-
-      status: item.Status || "",
-
-    }));
+      const formatted = items.map((item: any) => ({
+        ID: item.ID,
+        id: item.Title,
+        date: item.Created
+          ? new Date(item.Created).toLocaleDateString("en-GB")
+          : "",
+        EmployeeName: item.EmployeeName || "",
+        vendor: item.VendorName || "",
+        vendorCode: item.VendorCode || "",
+        po: item.PONumber || "",
+        amount: item.RequestedAmountforPayment || 0,
+        pendingWith: item.CurrentApprover?.Title || "",
+        status: item.Status || "",
+      }));
 
       setData(formatted);
     } catch (error) {
       console.error("Data error:", error);
     }
   };
+
   const filteredData = data.filter((item) => {
     const text = searchText.toLowerCase();
     const status = statusFilter.toLowerCase();
 
     let menuFilter = true;
-
     if (activeMenu === "Paid") {
       menuFilter = item.status?.toLowerCase() === "paid";
     } else if (activeMenu === "Rejected") {
-      menuFilter = item.status?.toLowerCase() === "rejected";
+      menuFilter = item.status?.toLowerCase() === "reject";
     } else if (activeMenu === "My Request") {
       menuFilter = true;
     }
@@ -188,10 +139,8 @@ const [currentPage, setCurrentPage] = useState(1);
   });
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-
   const paginatedData = filteredData.slice(startIndex, endIndex);
 
   const handleViewClick = async (item: any) => {
@@ -199,12 +148,8 @@ const [currentPage, setCurrentPage] = useState(1);
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
-
+        .select("*", "Author/EMail")
+        .expand("Author")();
       setSelectedItem(fullItem);
       setFormType("view");
       setShowForm(true);
@@ -212,78 +157,34 @@ const [currentPage, setCurrentPage] = useState(1);
       console.error("View error:", error);
     }
   };
-  // ✅ GET LIST DATA
+
   const handleEditClick = async (item: any) => {
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
-        .select(
-    "*",
-    "Author/EMail"
-  )
-  .expand("Author")();
-
+        .select("*", "Author/EMail")
+        .expand("Author")();
       setSelectedItem(fullItem);
       setFormType("Edit");
       setShowForm(true);
     } catch (error) {
-      console.error("View error:", error);
+      console.error("Edit error:", error);
     }
   };
 
-
-
-  
-  const handleFormOpen12 = async (item: any, type: "view" | "edit") => {
-    try {
-      const fullItem = await sp.web.lists
-  .getByTitle("CapexPayment")
-  .items.getById(item.ID)
-  .select(
-    "ID",
-    "Title",
-    "EmployeeName",
-    "CapexId",
-    "VendorName",
-   // "VendorCode",
-    "PONumber",
-    "PODate",
-    "POAmount",
-    "POPaymentTerms",              // ✅ ADD
-    "MRNNumber",
-    "MRNDtae",
-    "MRNAmountwithGST",           // ✅ ADD
-    "RequestedAmountforPayment",
-    "FinalPaymentAgainstPO",      // ✅ ADD
-    "InstallationDetails",        // ✅ ADD
-    "Status",
-    "Author/EMail"
-  )
-  .expand("Author")();
-
-
-      setSelectedItem(fullItem);
-     // setFormType(type); // ✅ dynamic
-      setShowForm(true);
-    } catch (error) {
-      console.error(`${type} error:`, error);
-    }
-  };
-
-  
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchText, statusFilter, activeMenu]);
+
   React.useEffect(() => {
     if (!context) return;
-
     void getLoggedInUser();
     void getCapexData();
   }, [context, activeMenu]);
-  // ✅ OPEN VIEW PAGE
+
   if (showForm) {
-   if (formType === "view") {
+    if (formType === "view") {
       return (
         <ViewAdvanceForm
           context={context}
@@ -296,7 +197,6 @@ const [currentPage, setCurrentPage] = useState(1);
         />
       );
     }
-
     if (formType === "new") {
       return (
         <NewAdvanceform
@@ -309,9 +209,6 @@ const [currentPage, setCurrentPage] = useState(1);
         />
       );
     }
-
-  
-
     if (formType === "Edit") {
       return (
         <EditAdvanceForm
@@ -351,7 +248,7 @@ const [currentPage, setCurrentPage] = useState(1);
           <li className="nav-item">
             <a
               className={
-                activeMenu === "My Request" ? " nav-link active" : "nav-link"
+                activeMenu === "My Request" ? "nav-link active" : "nav-link"
               }
               onClick={() => setActiveMenu("My Request")}
               style={{ cursor: "pointer" }}
@@ -361,9 +258,7 @@ const [currentPage, setCurrentPage] = useState(1);
           </li>
           <li className="nav-item">
             <a
-              className={
-                activeMenu === "Paid" ? " nav-link  active" : "nav-link"
-              }
+              className={activeMenu === "Paid" ? "nav-link active" : "nav-link"}
               onClick={() => setActiveMenu("Paid")}
               style={{ cursor: "pointer" }}
             >
@@ -373,7 +268,7 @@ const [currentPage, setCurrentPage] = useState(1);
           <li className="nav-item">
             <a
               className={
-                activeMenu === "Rejected" ? "nav-link  active" : "nav-link"
+                activeMenu === "Rejected" ? "nav-link active" : "nav-link"
               }
               onClick={() => setActiveMenu("Rejected")}
               style={{ cursor: "pointer" }}
@@ -383,6 +278,7 @@ const [currentPage, setCurrentPage] = useState(1);
           </li>
         </ul>
       </div>
+
       <div
         className="main"
         style={{ width: "calc(100% - 250px)", transition: "width 0.3s" }}
@@ -390,10 +286,11 @@ const [currentPage, setCurrentPage] = useState(1);
         <div className="header">
           <div className="left-banner">
             <div className="logo-text">
-              <h2> Capex Payment User Dashboard </h2>
+              <h2>Capex Payment User Dashboard</h2>
             </div>
           </div>
         </div>
+
         <div className="mainsecondapprove">
           <div className="mainsecondsmall">
             <div>
@@ -401,7 +298,7 @@ const [currentPage, setCurrentPage] = useState(1);
                 placeholder="Search"
                 value={searchText}
                 className="form-control"
-                style={{ width: "250px;" }}
+                style={{ width: "250px" }}
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
@@ -412,10 +309,20 @@ const [currentPage, setCurrentPage] = useState(1);
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">All</option>
-                <option value="Submitted">Submitted</option>
+                <option value="Pending for Approval">
+                  Pending for Approval
+                </option>
                 <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
+                <option value="Send Back">Send Back</option>
                 <option value="Draft">Draft</option>
+                <option value="Pending for Vouching Update">
+                  Pending for Vouching Update
+                </option>
+                <option value="Paid">Paid</option>
+                <option value="Pending for UTR Update">
+                  Pending for UTR Update
+                </option>
               </select>
             </div>
           </div>
@@ -432,6 +339,7 @@ const [currentPage, setCurrentPage] = useState(1);
             </a>
           </div>
         </div>
+
         <main className="Main-Dash mx-2">
           <div style={{ overflowX: "auto" }}>
             <div className="table-vert-scroll">
@@ -441,7 +349,7 @@ const [currentPage, setCurrentPage] = useState(1);
                   style={{ backgroundColor: "rgb(60, 62, 69)" }}
                 >
                   <tr>
-                     <th className="px-4 py-2">Action</th>
+                    <th className="px-4 py-2">Action</th>
                     <th className="px-4 py-2">Payment ID</th>
                     <th className="px-4 py-2">Requestor Date</th>
                     <th className="px-4 py-2">Requestor Name</th>
@@ -450,21 +358,19 @@ const [currentPage, setCurrentPage] = useState(1);
                     <th className="px-4 py-2">Vendor Name</th>
                     <th className="px-4 py-2">PO Number</th>
                     <th className="px-4 py-2">Request Amount</th>
-                    
                     <th className="px-4 py-2">Pending With</th>
                     <th className="px-4 py-2">Status</th>
-                   
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.length === 0 ? (
+                  {paginatedData.length === 0 ? (
                     <tr>
                       <td colSpan={11} style={{ textAlign: "center" }}>
                         No Data
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((item, i) => (
+                    paginatedData.map((item, i) => (
                       <tr key={i}>
                         <td className="px-4 py-2">
                           <div
@@ -474,6 +380,7 @@ const [currentPage, setCurrentPage] = useState(1);
                               alignItems: "center",
                             }}
                           >
+                            {/* View: show for all statuses except Draft */}
                             {item.status !== "Draft" && (
                               <span
                                 onClick={() => handleViewClick(item)}
@@ -482,16 +389,14 @@ const [currentPage, setCurrentPage] = useState(1);
                                 <img src={View} width={15} alt="View" />
                               </span>
                             )}
-                            {/* <span onClick={() => handleViewClick(item)} style={{ cursor: "pointer" }}>
-                              <img src={View} width={15} alt="View" />
-                            </span> */}
+                            {/* Edit: show only for Draft and Send Back */}
                             {(item.status === "Draft" ||
                               item.status === "Send Back") && (
                               <span
                                 onClick={() => handleEditClick(item)}
                                 style={{ cursor: "pointer" }}
                               >
-                                <img src={Edit} width={15} alt="View" />
+                                <img src={Edit} width={15} alt="Edit" />
                               </span>
                             )}
                           </div>
@@ -500,46 +405,43 @@ const [currentPage, setCurrentPage] = useState(1);
                         <td className="px-4 py-2">{item.date}</td>
                         <td className="px-4 py-2">{item.EmployeeName}</td>
                         <td className="px-4 py-2">Capex Payment</td>
-                        <td className="px-4 py-2"> {item.vendorCode}</td>
+                        <td className="px-4 py-2">{item.vendorCode}</td>
                         <td className="px-4 py-2">{item.vendor}</td>
                         <td className="px-4 py-2">{item.po}</td>
                         <td className="px-4 py-2">₹ {item.amount}</td>
-                        
-                        <td className="px-4 py-2">Approver</td>
+                        <td className="px-4 py-2">{item.pendingWith || "-"}</td>
                         <td className="px-4 py-2">{item.status}</td>
-                        
                       </tr>
                     ))
                   )}
-                </tbody>
+                </tbody>  
               </table>
-               <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginTop: "15px",
-                  }}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginTop: "15px",
+                }}
+              >
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
                 >
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    Previous
-                  </button>
-
-                  <span>
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <button
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </main>
