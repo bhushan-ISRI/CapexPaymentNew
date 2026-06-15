@@ -331,7 +331,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                     </thead>
                     <tbody>
                       {workflowHistory
-                        .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Draft Saved" && h.ActionTaken !== "Edited")
+                        .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Edited")
                         .map((h: any, idx: number) => (
                           <tr key={idx}>
                             <td style={{ padding: "8px" }}>{h.CurrentApprover || ""}</td>

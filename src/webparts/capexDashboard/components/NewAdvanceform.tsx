@@ -339,7 +339,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         FinalPaymentAgainstPO: finalPayment === "Yes",
         InstallationDetails: installationDetails,
         RequesterRemarks: requesterRemarks,
-        // ✅ Updated status: "Pending for Approval" on Submit
         StatusFlow: "Pending for Approval",
         Status: "Pending for Approval",
         ApprovalMatrix: JSON.stringify(flow),
@@ -410,7 +409,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         FinalPaymentAgainstPO: finalPayment === "Yes",
         InstallationDetails: installationDetails,
         RequesterRemarks: requesterRemarks,
-        // ✅ Status: "Draft" on Save as Draft
         StatusFlow: "Draft",
         Status: "Draft",
         ApprovalMatrix: JSON.stringify(flow),
@@ -716,7 +714,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                         type="button"
                         onClick={() =>
                           window.open(
-                            "https://isriglobal.sharepoint.com/sites/SonaFinance/SitePages/Installation.aspx",
+                            `${context.pageContext.web.absoluteUrl}/SitePages/Installation.aspx`,
                             "_blank",
                             "noopener,noreferrer",
                           )
@@ -726,7 +724,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                           color: "#fff",
                           padding: "6px 14px",
                           borderRadius: "4px",
-                          border: "none",
+                          border: "none", 
                           fontSize: "14px",
                           cursor: "pointer",
                           display: "inline-block",
@@ -746,73 +744,66 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                 <div className="row mb-20">
                   <div className="col-md-12">
                     <div style={{ overflowX: "auto" }}>
-                      <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
-                        <thead
-                          className="text-white"
-                          style={{ backgroundColor: "rgb(60, 62, 69)" }}
-                        >
-                          <tr>
-                            <th className="px-4 py-2">PO Number</th>
-                            <th className="px-4 py-2">Previous Advance</th>
-                            <th className="px-4 py-2">Requested Date</th>
-                            <th className="px-4 py-2">Paid Date</th>
-                            <th className="px-4 py-2">Voucher No</th>
-                            <th className="px-4 py-2">Settled Amount</th>
-                            <th className="px-4 py-2">Pending Advance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previousAdvances.length === 0 ? (
+                      <div className="table-vert-scroll">
+                        <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
+                          <thead
+                            className="text-white"
+                            style={{ backgroundColor: "rgb(60, 62, 69)" }}
+                          >
                             <tr>
-                              <td
-                                colSpan={7}
-                                style={{ textAlign: "center", padding: "10px" }}
-                              >
-                                {selectedVendorId
-                                  ? "No previous advances available"
-                                  : "Select a vendor to load advances"}
-                              </td>
+                              <th className="px-4 py-2">PO Number</th>
+                              <th className="px-4 py-2">Previous Advance</th>
+                              <th className="px-4 py-2">Requested Date</th>
+                              <th className="px-4 py-2">Paid Date</th>
+                              <th className="px-4 py-2">MRN No</th>
+                              <th className="px-4 py-2">Settled Amount</th>
+                              <th className="px-4 py-2">Pending Advance</th>
                             </tr>
-                          ) : (
-                            previousAdvances.map((item: any, index: number) => {
-                              const pending = Math.max(
-                                0,
-                                Number(item.RequestAdvanceAmount || 0) -
-                                  Number(item.PaidAmount || 0),
-                              );
-                              return (
-                                <tr key={index}>
-                                  <td className="px-4 py-2">{item.PONumber}</td>
-                                  <td className="px-4 py-2">
-                                    {item.RequestAdvanceAmount}
-                                  </td>
-                                  <td className="px-4 py-2">
-                                    {item.Created
-                                      ? new Date(
-                                          item.Created,
-                                        ).toLocaleDateString("en-GB")
-                                      : ""}
-                                  </td>
-                                  <td className="px-4 py-2">
-                                    {item.VoucherDate
-                                      ? new Date(
-                                          item.VoucherDate,
-                                        ).toLocaleDateString("en-GB")
-                                      : ""}
-                                  </td>
-                                  <td className="px-4 py-2">
-                                    {item.VouchingNumber}
-                                  </td>
-                                  <td className="px-4 py-2">
-                                    {item.PaidAmount}
-                                  </td>
-                                  <td className="px-4 py-2">{pending}</td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {previousAdvances.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} style={{ textAlign: "center" }}>
+                                  No previous advances available
+                                </td>
+                              </tr>
+                            ) : (
+                              previousAdvances.map(
+                                (item: any, index: number) => {
+                                  const pending = Math.max(
+                                    0,
+                                    Number(item.RequestAdvanceAmount || 0) -
+                                      Number(item.PaidAmount || 0),
+                                  );
+                                  return (
+                                    <tr key={index}>
+                                      <td>{item.PONumber}</td>
+                                      <td>{item.RequestAdvanceAmount}</td>
+                                      <td>
+                                        {item.Created
+                                          ? new Date(
+                                              item.Created,
+                                            ).toLocaleDateString()
+                                          : ""}
+                                      </td>
+                                      <td>
+                                        {item.VoucherDate
+                                          ? new Date(
+                                              item.VoucherDate,
+                                            ).toLocaleDateString()
+                                          : ""}
+                                      </td>
+                                      <td>{item.VoucherNumber}</td>
+                                      <td>{item.PaidAmount}</td>
+                                      <td>{pending}</td>
+                                    </tr>
+                                  );
+                                },
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>

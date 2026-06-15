@@ -204,7 +204,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     if (mrnDate > localDate) errors.push("MRN date cannot be a future date");
     if (!mrnAmount || mrnAmount.trim() === "") errors.push("Please enter MRN Amount");
     if (!requestedAmount || requestedAmount.trim() === "") errors.push("Please enter Requested Amount");
-    if (finalPayment === "Yes" && !installationDetails) errors.push("Please enter Installation Details");
     if ((!attachments || attachments.length === 0) && (!selectedFiles || selectedFiles.length === 0))
       errors.push("Please upload at least one attachment");
     if (requestedAmount && mrnAmount && Number(requestedAmount) > Number(mrnAmount))
@@ -230,7 +229,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       const history = formData.WorkflowHistory ? JSON.parse(formData.WorkflowHistory) : [];
       history.push({
         CurrentApprover: employee.EmployeeName,
-        ActionTaken: "Edited",
+        ActionTaken: "Submitted",
+        Comment: requesterRemarks,
         Date: new Date().toISOString(),
       });
       const currentApproverId = formData.CurrentApproverId || null;
@@ -257,7 +257,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         MRNAmountwithGST: mrnAmount?.toString(),
         RequestedAmountforPayment: requestedAmount ? requestedAmount.toString() : "",
         FinalPaymentAgainstPO: finalPayment === "Yes",
-        InstallationDetails: installationDetails,
+        InstallationDetails: installationDetails, 
         RequesterRemarks: requesterRemarks,
         // Updated status: "Pending for Approval" on Submit
         StatusFlow: "Pending for Approval",
@@ -283,11 +283,13 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     setIsDraftSaving(true);
     try {
       const flow = await buildApprovalFlow();
+      flow.forEach((f: any) => (f.Status = "Pending"));
       const currentApprover = flow.length > 0 ? flow[0].Id : null;
       const history = formData.WorkflowHistory ? JSON.parse(formData.WorkflowHistory) : [];
       history.push({
         CurrentApprover: employee.EmployeeName,
-        ActionTaken: "Edited",
+        ActionTaken: "Draft Saved",
+        Comment: requesterRemarks || "",
         Date: new Date().toISOString(),
       });
       await sp.web.lists.getByTitle("CapexPayment").items.getById(formData.ID).update({
@@ -329,6 +331,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       console.error("ERROR:", error);
       await Swal.fire({ icon: "error", title: "Save Failed", text: "Error while saving.", confirmButtonText: "OK" });
     } finally {
+      draftRef.current = false;
       setIsDraftSaving(false);
     }
   };
@@ -558,9 +561,29 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                     </select>
                   </div>
                   {finalPayment === "Yes" && (
-                    <div className="col-md-4">
-                      <label className="font">Installation Details <span className="required">*</span></label>
-                      <input value={installationDetails} onChange={(e) => setInstallationDetails(e.target.value)} className="form-control" />
+                    <div className="col-md-4 d-flex align-items-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `${context.pageContext.web.absoluteUrl}/SitePages/Installation.aspx`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        style={{
+                          backgroundColor: "#000",
+                          color: "#fff",
+                          padding: "6px 14px",
+                          borderRadius: "4px",
+                          border: "none",
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          display: "inline-block",
+                        }}
+                      >
+                        Open Installation Form
+                      </button>
                     </div>
                   )}
                 </div>
@@ -624,7 +647,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                         </thead>
                         <tbody>
                           {workflowHistory
-                            .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Draft Saved" && h.ActionTaken !== "Edited")
+                            .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Edited")
                             .map((h: any, idx: number) => (
                               <tr key={idx}>
                                 <td style={{ padding: "8px" }}>{h.CurrentApprover || ""}</td>
