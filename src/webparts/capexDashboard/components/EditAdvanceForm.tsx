@@ -3,7 +3,7 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState, useRef } from "react";
-// ✅ REMOVED: useNavigate import — not needed, form is a child component
+// REMOVED: useNavigate import — not needed, form is a child component
 import logo from "../assets/sona-comstarlogo.png";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
@@ -26,7 +26,6 @@ interface IPreviousAdvance {
 
 const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const sp = spfi().using(SPFx(context));
-  // ✅ REMOVED: const navigate = useNavigate();
   const today = new Date();
   const submitRef = useRef(false);
   const draftRef = useRef(false);
@@ -225,7 +224,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         });
         return;
       }
-      const existingFlow = formData.ApprovalMatrix ? JSON.parse(formData.ApprovalMatrix) : [];
       const history = formData.WorkflowHistory ? JSON.parse(formData.WorkflowHistory) : [];
       history.push({
         CurrentApprover: employee.EmployeeName,
@@ -233,7 +231,15 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         Comment: requesterRemarks,
         Date: new Date().toISOString(),
       });
-      const currentApproverId = formData.CurrentApproverId || null;
+
+      // Rebuild the approval flow from scratch via buildApprovalFlow(), same as
+      // NewAdvanceform's handleSubmit. This guarantees CurrentApproverId is always
+      // assigned (RM if present, else HOD, else first matrix approver) instead of
+      // reusing a stale/stranded ApprovalMatrix + CurrentApproverId left over from
+      // a prior Send Back, where the previous approach could leave it unassigned.
+      const flow = await buildApprovalFlow();
+      const currentApproverId = flow.length > 0 ? flow[0].Id : null;
+
       await sp.web.lists.getByTitle("CapexPayment").items.getById(formData.ID).update({
         Title: formData.CapexId,
         CapexId: formData.CapexId,
@@ -261,13 +267,12 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         RequesterRemarks: requesterRemarks,
         StatusFlow: "Pending for Approval",
         Status: "Pending for Approval",
-        ApprovalMatrix: JSON.stringify(existingFlow),
+        ApprovalMatrix: JSON.stringify(flow),
         CurrentApproverId: currentApproverId,
         WorkflowHistory: JSON.stringify(history),
       });
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Updated successfully.", confirmButtonText: "OK" });
-      // ✅ FIX: use onClose() instead of navigate("/User")
       onClose();
     } catch (error: any) {
       console.error("FULL ERROR:", error);
@@ -324,7 +329,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       });
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Draft saved successfully.", confirmButtonText: "OK" });
-      // ✅ FIX: use onClose() instead of navigate("/User")
       onClose();
     } catch (error) {
       console.error("ERROR:", error);
@@ -381,6 +385,77 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     void getVendors();
   }, []);
 
+  // ===== Ribbon color logic (same rules as ViewAdvanceForm) =====
+  // Colors: "approved" = green, "active" = orange (current approver / send-back target),
+  // "upcoming" = yellow, "rejected" = red. Driven by the overall request Status
+  // (formData.Status) plus each step's own Status inside approvalMatrix.
+  //
+  // Rules:
+  // - Paid: Initiator + every approver step = green.
+  // - Reject: the step with Status "Reject"/"Rejected" = red; steps before it = green;
+  //   steps after it = yellow.
+  // - Send Back / Draft: the requester is the active step (orange) — for Send Back
+  //   because CurrentApprover is cleared, for Draft because it hasn't been
+  //   submitted yet — and every approver step is upcoming (yellow), never green.
+  // - Otherwise (still in progress, e.g. Pending for Approval): steps already
+  //   Approved = green, the step with Status "In Progress" = orange, steps after = yellow.
+  const overallStatus: string = formData?.Status || "";
+
+  const buildRibbonSteps = () => {
+    const initiatorStep = {
+      Role: "Initiator",
+      Name: employee.EmployeeName || formData?.EmployeeName || "",
+      Status: "Approved",
+    };
+    const approverSteps = approvalMatrix.filter((a) => a.Role !== "Initiator");
+    const steps = [initiatorStep, ...approverSteps];
+
+    if (overallStatus === "Paid") {
+      return steps.map((s) => ({ ...s, _color: "approved" }));
+    }
+
+    if (overallStatus === "Reject") {
+      const rejectIndex = steps.findIndex((s) => s.Status === "Reject" || s.Status === "Rejected");
+      return steps.map((s, idx) => {
+        if (rejectIndex === -1) return { ...s, _color: "" };
+        if (idx === rejectIndex) return { ...s, _color: "rejected" };
+        if (idx < rejectIndex) return { ...s, _color: "approved" };
+        return { ...s, _color: "upcoming" };
+      });
+    }
+
+    if (overallStatus === "Send Back" || overallStatus === "Draft") {
+      // Draft: the request hasn't been submitted yet, so the requester is still
+      // the active step (orange), not "done" (green) — nothing downstream has
+      // started, so every approver step is upcoming (yellow).
+      return steps.map((s) =>
+        s.Role === "Initiator" ? { ...s, _color: "active" } : { ...s, _color: "upcoming" },
+      );
+    }
+
+    // Default: still in progress (Pending for Approval, etc.)
+    return steps.map((s) => {
+      if (s.Status === "Approved") return { ...s, _color: "approved" };
+      if (s.Status === "In Progress") return { ...s, _color: "active" };
+      return { ...s, _color: "upcoming" };
+    });
+  };
+
+  const getStepClass = (color: string) => {
+    switch (color) {
+      case "approved": return "approved";   // green
+      case "active": return "active";       // orange — current approver / send-back target
+      case "upcoming": return "upcoming";   // yellow — not yet reached
+      case "rejected": return "rejected";   // red
+      default: return "";
+    }
+  };
+  // Add these rules to advanced.scss if not already present:
+  //   .approval-step.approved { background-color: green; color: #fff; }
+  //   .approval-step.active   { background-color: orange; color: #fff; }
+  //   .approval-step.upcoming { background-color: #f5d800; color: #333; }
+  //   .approval-step.rejected { background-color: red; color: #fff; }
+
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row">
@@ -391,17 +466,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
               <h1>Edit Advance Payment</h1>
             </div>
             <ul className="approval-flow">
-              <li className="approval-step">Initiator - {employee.EmployeeName}</li>
-              {approvalMatrix.map((a, index) => (
-                <li
-                  key={index}
-                  className={`approval-step ${
-                    a.Status === "In Progress" ? "active" :
-                    a.Status === "Approved" ? "approved" :
-                    a.Status === "Rejected" ? "rejected" :
-                    a.Status === "Send Back" ? "sendback" : ""
-                  }`}
-                >
+              {buildRibbonSteps().map((a, index) => (
+                <li key={index} className={`approval-step ${getStepClass(a._color)}`}>
                   {a.Role} - {a.Name}
                 </li>
               ))}

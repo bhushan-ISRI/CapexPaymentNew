@@ -380,23 +380,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                               alignItems: "center",
                             }}
                           >
-                            {/* View: show for all statuses except Draft */}
-                            {item.status !== "Draft" && (
-                              <span
-                                onClick={() => handleViewClick(item)}
-                                style={{ cursor: "pointer" }}
-                              >
-                                <img src={View} width={15} alt="View" />
-                              </span>
-                            )}
-                            {/* Edit: show only for Draft and Send Back */}
-                            {(item.status === "Draft" ||
-                              item.status === "Send Back") && (
+                            {item.status === "Draft" ||
+                            item.status === "Send Back" ? (
                               <span
                                 onClick={() => handleEditClick(item)}
                                 style={{ cursor: "pointer" }}
                               >
                                 <img src={Edit} width={15} alt="Edit" />
+                              </span>
+                            ) : (
+                              <span
+                                onClick={() => handleViewClick(item)}
+                                style={{ cursor: "pointer" }}
+                              >
+                                <img src={View} width={15} alt="View" />
                               </span>
                             )}
                           </div>
@@ -414,7 +411,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                       </tr>
                     ))
                   )}
-                </tbody>  
+                </tbody>
               </table>
 
               <div

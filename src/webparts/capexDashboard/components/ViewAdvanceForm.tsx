@@ -192,18 +192,78 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const handleExit = () => { if (onClose) onClose(); else window.location.reload(); };
 
-  const getStepClass = (status: string) => {
-    switch (status) {
-      case "In Progress": return "active";
-      case "Approved": return "approved";
-      case "Rejected": return "rejected";
-      case "Send Back": return "sendback";
-      case "Paid": return "approved";
-      case "Pending for Vouching Update": return "active";
-      case "Pending for UTR Update": return "active";
+  // ===== Ribbon color logic =====
+  // Colors: "approved" = green, "active" = orange (current approver), "upcoming" = yellow,
+  // "rejected" = red. Driven by the overall request Status (formData.Status), the
+  // per-step Status inside approvalMatrix, and — for Send Back, where CurrentApprover
+  // is cleared — the WorkflowHistory entries in the CapexPayment list.
+  //
+  // Rules:
+  // - Paid: Initiator + every approver step = green.
+  // - Reject: the step that has Status "Reject" = red; steps before it = green;
+  //   steps after it = yellow.
+  // - Send Back: CurrentApprover goes blank, so we can't trust matrix "In Progress".
+  //   The Initiator (requester) = orange, every approver step = yellow.
+  // - Otherwise (still in progress, e.g. Pending for Approval / Pending for Vouching
+  //   Update / Pending for UTR Update): steps already Approved = green, the step
+  //   with Status "In Progress" = orange, steps after that = yellow.
+  const overallStatus: string = formData?.Status || "";
+
+  const buildRibbonSteps = () => {
+    const initiatorStep = {
+      Role: "Initiator",
+      Name: formData?.EmployeeName || employee.EmployeeName || "",
+      Status: "Approved",
+    };
+    const approverSteps = approvalMatrix.filter((a) => a.Role !== "Initiator");
+    const steps = [initiatorStep, ...approverSteps];
+
+    if (overallStatus === "Paid") {
+      return steps.map((s) => ({ ...s, _color: "approved" }));
+    }
+
+    if (overallStatus === "Reject") {
+      const rejectIndex = steps.findIndex((s) => s.Status === "Reject" || s.Status === "Rejected");
+      return steps.map((s, idx) => {
+        if (rejectIndex === -1) return { ...s, _color: "" };
+        if (idx === rejectIndex) return { ...s, _color: "rejected" };
+        if (idx < rejectIndex) return { ...s, _color: "approved" };
+        return { ...s, _color: "upcoming" };
+      });
+    }
+
+    if (overallStatus === "Send Back" || overallStatus === "Draft") {
+      // CurrentApprover is blank by this point for Send Back, and for Draft the
+      // request hasn't been submitted yet — either way the requester is the
+      // active step (orange), not "done" (green), and every approver step is
+      // upcoming (yellow).
+      return steps.map((s) =>
+        s.Role === "Initiator" ? { ...s, _color: "active" } : { ...s, _color: "upcoming" },
+      );
+    }
+
+    // Default: still in progress through the approval chain.
+    return steps.map((s) => {
+      if (s.Status === "Approved") return { ...s, _color: "approved" };
+      if (s.Status === "In Progress") return { ...s, _color: "active" };
+      return { ...s, _color: "upcoming" };
+    });
+  };
+
+  const getStepClass = (color: string) => {
+    switch (color) {
+      case "approved": return "approved";   // green
+      case "active": return "active";       // orange — current approver / send-back target
+      case "upcoming": return "upcoming";   // yellow — not yet reached
+      case "rejected": return "rejected";   // red
       default: return "";
     }
   };
+  // Add these rules to advanced.scss if not already present:
+  //   .approval-step.approved { background-color: green; color: #fff; }
+  //   .approval-step.active   { background-color: orange; color: #fff; }
+  //   .approval-step.upcoming { background-color: #f5d800; color: #333; }
+  //   .approval-step.rejected { background-color: red; color: #fff; }
 
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
@@ -213,11 +273,8 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
         {approvalMatrix.length === 0 ? (<p>No approval data</p>) : (
           <div className="displayWF">
             <ul className="approval-flow">
-              {[
-                { Role: "Initiator", Name: formData?.EmployeeName || employee.EmployeeName || "", Status: "Approved" },
-                ...approvalMatrix.filter((a) => a.Role !== "Initiator")
-              ].map((a, index) => (
-                <li key={index} className={`approval-step ${getStepClass(a.Status)}`}>
+              {buildRibbonSteps().map((a, index) => (
+                <li key={index} className={`approval-step ${getStepClass(a._color)}`}>
                   {a.Role} - {a.Name}
                 </li>
               ))}
@@ -350,7 +407,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             </div>
           </div>
 
-          {/* Voucher Detail's */}
+          {/* Voucher Details */}
           <div className="main-formcontainer" style={{ marginTop: "10px" }}>
             <div className="row mb-20">
               <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
@@ -358,6 +415,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             </div>
           </div>
 
+          {/* UTR Details — UTR fields + UTR Attachments shown together, sourced ONLY from CapexPaymentUTRDocs */}
           <div className="heading1" style={{ marginTop: "10px" }}><label>UTR Details</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">
@@ -387,7 +445,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
               <div className="col-md-12">
                 {workflowHistory.length === 0 ? (<p>No history available</p>) : (
                   <table className="workflow-table" style={{ width: "100%" }}>
-                    <thead className ="WorkFlow-thead">
+                    <thead>
                       <tr>
                         <th style={{ padding: "8px", textAlign: "left" }}>Action By</th>
                         <th style={{ padding: "8px", textAlign: "left" }}>Action Taken</th>
@@ -426,4 +484,4 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   );
 };
 
-export default ViewAdvanceForm; 
+export default ViewAdvanceForm;
