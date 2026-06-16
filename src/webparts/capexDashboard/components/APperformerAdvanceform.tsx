@@ -3,7 +3,6 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   PeoplePicker,
   PrincipalType,
@@ -15,6 +14,7 @@ import Swal from "sweetalert2";
 interface IProps {
   context: any;
   itemId: number;
+  onClose: () => void;
 }
 
 interface IVendor {
@@ -23,9 +23,12 @@ interface IVendor {
   VendorName: string;
 }
 
-const APperformerAdvanceform: React.FC<IProps> = ({ context, itemId }) => {
+const APperformerAdvanceform: React.FC<IProps> = ({
+  context,
+  itemId,
+  onClose,
+}) => {
   const sp = spfi().using(SPFx(context));
-  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const actionLock = React.useRef(false);
   const [previousAdvances, setPreviousAdvances] = useState<any[]>([]);
@@ -308,7 +311,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({ context, itemId }) => {
         confirmButtonText: "OK",
       });
 
-      navigate("/Performer");
+      onClose();
     } catch (error) {
       console.error("Approve error:", error);
       await Swal.fire({
@@ -407,7 +410,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({ context, itemId }) => {
         confirmButtonText: "OK",
       });
 
-      navigate("/Performer");
+      onClose();
     } catch (error) {
       console.error(error);
       await Swal.fire({
@@ -500,7 +503,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({ context, itemId }) => {
         text: "Request rejected successfully.",
         confirmButtonText: "OK",
       });
-      navigate("/Performer");
+      onClose();
     } catch (error) {
       console.error(error);
       await Swal.fire({
@@ -818,11 +821,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({ context, itemId }) => {
                     >
                       {isSubmitting ? "Processing..." : "Reject"}
                     </a>
-                    <a
-                      href="#"
-                      onClick={() => navigate("/Performer")}
-                      className="reset-btn"
-                    >
+                    <a href="#" onClick={onClose} className="reset-btn">
                       Exit
                     </a>
                   </div>

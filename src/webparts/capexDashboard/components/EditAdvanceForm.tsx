@@ -3,7 +3,7 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+// ✅ REMOVED: useNavigate import — not needed, form is a child component
 import logo from "../assets/sona-comstarlogo.png";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
@@ -26,7 +26,7 @@ interface IPreviousAdvance {
 
 const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const sp = spfi().using(SPFx(context));
-  const navigate = useNavigate();
+  // ✅ REMOVED: const navigate = useNavigate();
   const today = new Date();
   const submitRef = useRef(false);
   const draftRef = useRef(false);
@@ -257,9 +257,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         MRNAmountwithGST: mrnAmount?.toString(),
         RequestedAmountforPayment: requestedAmount ? requestedAmount.toString() : "",
         FinalPaymentAgainstPO: finalPayment === "Yes",
-        InstallationDetails: installationDetails, 
+        InstallationDetails: installationDetails,
         RequesterRemarks: requesterRemarks,
-        // Updated status: "Pending for Approval" on Submit
         StatusFlow: "Pending for Approval",
         Status: "Pending for Approval",
         ApprovalMatrix: JSON.stringify(existingFlow),
@@ -268,7 +267,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       });
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Updated successfully.", confirmButtonText: "OK" });
-      navigate("/User");
+      // ✅ FIX: use onClose() instead of navigate("/User")
+      onClose();
     } catch (error: any) {
       console.error("FULL ERROR:", error);
       await Swal.fire({ icon: "error", title: "Update Failed", text: error?.data?.responseBody || "Error while saving.", confirmButtonText: "OK" });
@@ -288,7 +288,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       const history = formData.WorkflowHistory ? JSON.parse(formData.WorkflowHistory) : [];
       history.push({
         CurrentApprover: employee.EmployeeName,
-        ActionTaken: "Draft Saved",
         Comment: requesterRemarks || "",
         Date: new Date().toISOString(),
       });
@@ -317,7 +316,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         FinalPaymentAgainstPO: finalPayment === "Yes",
         InstallationDetails: installationDetails,
         RequesterRemarks: requesterRemarks,
-        // ✅ Status: "Draft" on Save as Draft
         StatusFlow: "Draft",
         Status: "Draft",
         ApprovalMatrix: JSON.stringify(flow),
@@ -326,7 +324,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       });
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Draft saved successfully.", confirmButtonText: "OK" });
-      navigate("/User");
+      // ✅ FIX: use onClose() instead of navigate("/User")
+      onClose();
     } catch (error) {
       console.error("ERROR:", error);
       await Swal.fire({ icon: "error", title: "Save Failed", text: "Error while saving.", confirmButtonText: "OK" });
@@ -336,7 +335,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
-  // ✅ Step 1: Bind all text fields from formData directly
   useEffect(() => {
     if (!formData) return;
     setPoNumber(formData.PONumber || "");
@@ -367,7 +365,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     } else { setWorkflowHistory([]); }
   }, [formData]);
 
-  // ✅ Step 2: Once vendors load, match VendorCode string → Id for dropdown & load previous advances
   useEffect(() => {
     if (vendors.length > 0 && selectedVendorCode) {
       const match = vendors.find((v) => v.VendorCode === selectedVendorCode);
@@ -647,7 +644,12 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                         </thead>
                         <tbody>
                           {workflowHistory
-                            .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Edited")
+                            .filter(
+                              (h: any) =>
+                                h.ActionTaken &&
+                                h.ActionTaken !== "Edited" &&
+                                h.ActionTaken !== "Draft Saved",
+                            )
                             .map((h: any, idx: number) => (
                               <tr key={idx}>
                                 <td style={{ padding: "8px" }}>{h.CurrentApprover || ""}</td>
@@ -682,7 +684,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                 >
                   {isDraftSaving ? "Saving..." : "Save as Draft"}
                 </button>
-                <a href="#" onClick={() => (onClose ? onClose() : navigate("/User"))} className="reset-btn">Exit</a>
+                <button type="button" onClick={onClose} className="reset-btn">Exit</button>
               </div>
             </div>
           </div>

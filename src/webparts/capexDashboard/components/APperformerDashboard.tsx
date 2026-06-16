@@ -32,6 +32,15 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const [currentUserName, setCurrentUserName] = React.useState("");
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
 
+  // Shared close handler for all forms opened from this dashboard.
+  // Hides the form, clears the form type/selection, and refreshes the list.
+  const handleFormClose = () => {
+    setShowForm(false);
+    setFormType(null);
+    setSelectedItem(null);
+    void getCapexData();
+  };
+
   const handleFormOpen = async (
     item: any,
     type: "view" | "approve" | "approveUTR",
@@ -170,14 +179,14 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       } else if (activeMenu === "Paid") {
         filterQuery = `
     Status eq 'Paid'
-    and Author/Id eq ${currentUser.Id}
+    and CurrentApproverId eq ${currentUser.Id}
   `
           .replace(/\n/g, "")
           .trim();
       } else if (activeMenu === "Rejected") {
         filterQuery = `
     Status eq 'Reject'
-    and Author/Id eq ${currentUser.Id}
+    and CurrentApproverId eq ${currentUser.Id}
   `
           .replace(/\n/g, "")
           .trim();
@@ -263,7 +272,11 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   if (showForm) {
     if (formType === "approve") {
       return (
-        <APperformerAdvanceform context={context} itemId={selectedItem?.ID} />
+        <APperformerAdvanceform
+          context={context}
+          itemId={selectedItem?.ID}
+          onClose={handleFormClose}
+        />
       );
     }
     if (formType === "approveUTR") {
@@ -271,6 +284,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         <APperformerAdvanceFormForUTR
           context={context}
           itemId={selectedItem?.ID}
+          onClose={handleFormClose}
         />
       );
     }
@@ -279,11 +293,7 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         <ViewAdvanceForm
           context={context}
           formData={selectedItem}
-          onClose={() => {
-            setShowForm(false);
-            setFormType(null);
-            void getCapexData();
-          }}
+          onClose={handleFormClose}
         />
       );
     }

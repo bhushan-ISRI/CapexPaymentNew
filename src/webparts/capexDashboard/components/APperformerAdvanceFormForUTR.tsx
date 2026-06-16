@@ -22,6 +22,11 @@ interface IVendor {
   VendorName: string;
 }
 
+// Library names kept as constants so requestor docs and UTR docs can never
+// accidentally be pointed at the same library again.
+const REQUESTOR_DOCS_LIBRARY = "CapexPaymentDocs";
+const UTR_DOCS_LIBRARY = "CapexPaymentUTRDocs";
+
 const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
   context,
   itemId,
@@ -32,7 +37,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
   const sp = spfi().using(SPFx(context));
   const [previousAdvances, setPreviousAdvances] = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
-  // ✅ New state for UTR attachments (optional upload)
+  // Files already saved in CapexPaymentUTRDocs (loaded on open, refreshed after upload)
+  const [savedUtrAttachments, setSavedUtrAttachments] = useState<any[]>([]);
+  // Files picked locally but not yet uploaded
   const [utrFiles, setUtrFiles] = useState<File[]>([]);
   const today = new Date();
   const localDate: string = new Date(
@@ -109,21 +116,43 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         .expand("VendorCode")
         .filter(`VendorCode/Id eq ${vendorId} and Status eq 'Paid'`)
         .orderBy("Created", false)();
-      void setPreviousAdvances(data);
+      setPreviousAdvances(data);
     } catch (error) {
       console.error("Error fetching previous advances:", error);
-      void setPreviousAdvances([]);
+      setPreviousAdvances([]);
     }
   };
 
+  // Requestor attachments — ALWAYS from CapexPaymentDocs
   const getAttachments = async (capexId: string) => {
     try {
       const safe = capexId.replace(/\//g, "_");
-      const path = `/sites/SonaFinance/CapexPaymentDocs/${safe}`;
+      const libraryRootFolder = await sp.web.lists
+        .getByTitle(REQUESTOR_DOCS_LIBRARY)
+        .rootFolder();
+      const path = `${libraryRootFolder.ServerRelativeUrl}/${safe}`;
       const files = await sp.web.getFolderByServerRelativePath(path).files();
-      void setAttachments(files);
-    } catch {
-      void setAttachments([]);
+      setAttachments(files || []);
+    } catch (error) {
+      console.log(`No requestor attachments found in ${REQUESTOR_DOCS_LIBRARY}`, error);
+      setAttachments([]);
+    }
+  };
+
+  // UTR attachments already saved — ALWAYS read from CapexPaymentUTRDocs ONLY.
+  // Folder may not exist yet on first UTR submission, which is expected.
+  const getSavedUTRAttachments = async (capexId: string) => {
+    try {
+      const safe = capexId.replace(/\//g, "_");
+      const libraryRootFolder = await sp.web.lists
+        .getByTitle(UTR_DOCS_LIBRARY)
+        .rootFolder();
+      const utrFolderPath = `${libraryRootFolder.ServerRelativeUrl}/${safe}`;
+      const files = await sp.web.getFolderByServerRelativePath(utrFolderPath).files();
+      setSavedUtrAttachments(files || []);
+    } catch (error) {
+      console.log(`No UTR attachments found yet in ${UTR_DOCS_LIBRARY}`, error);
+      setSavedUtrAttachments([]);
     }
   };
 
@@ -187,7 +216,8 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       setSelectedVendorName(item?.VendorName || "");
 
       if (item.CapexId) {
-        await getAttachments(item.CapexId);
+        await getAttachments(item.CapexId);           // -> CapexPaymentDocs
+        await getSavedUTRAttachments(item.CapexId);    // -> CapexPaymentUTRDocs
       }
 
       if (item.ApprovalMatrix) {
@@ -238,32 +268,48 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   }, [selectedVendorId]);
 
-  // ✅ Upload UTR attachments to the same CapexPaymentDocs folder as the request
+  // Upload UTR attachments to CapexPaymentUTRDocs ONLY, under a folder named by capexId.
+  // Never touches CapexPaymentDocs.
   const uploadUTRAttachments = async (capexId: string) => {
     if (!utrFiles || utrFiles.length === 0) return;
     try {
       const safe = capexId.replace(/\//g, "_");
-      const webUrl = context.pageContext.web.serverRelativeUrl;
-      const folderPath = `${webUrl}/CapexPaymentDocs/${safe}`;
 
-      // Ensure folder exists (it should already exist from original submission)
+      const libraryRootFolder = await sp.web.lists
+        .getByTitle(UTR_DOCS_LIBRARY)
+        .rootFolder();
+
+      const libraryServerRelativeUrl = libraryRootFolder.ServerRelativeUrl;
+      const utrFolderPath = `${libraryServerRelativeUrl}/${safe}`;
+
+      // Ensure the folder exists in CapexPaymentUTRDocs — create it if not
+      let folderExists = true;
       try {
-        await sp.web.getFolderByServerRelativePath(folderPath)();
+        await sp.web.getFolderByServerRelativePath(utrFolderPath)();
       } catch {
-        // Folder doesn't exist — create it
-        await sp.web.getFolderByServerRelativePath(
-          `${webUrl}/CapexPaymentDocs`,
-        ).folders.addUsingPath(safe);
+        folderExists = false;
+      }
+      if (!folderExists) {
+        await sp.web
+          .getFolderByServerRelativePath(libraryServerRelativeUrl)
+          .folders.addUsingPath(safe);
       }
 
+      // Upload each file into the CapexPaymentUTRDocs/<capexId> folder
       for (const file of utrFiles) {
+        const arrayBuffer = await file.arrayBuffer();
         await sp.web
-          .getFolderByServerRelativePath(folderPath)
-          .files.addUsingPath(file.name, file, { Overwrite: true });
+          .getFolderByServerRelativePath(utrFolderPath)
+          .files.addUsingPath(file.name, arrayBuffer, { Overwrite: true });
       }
+
+      // Refresh the saved list from CapexPaymentUTRDocs so UI reflects what's actually stored
+      await getSavedUTRAttachments(capexId);
+      // Clear the local pending-upload queue now that they're persisted
+      setUtrFiles([]);
     } catch (error) {
-      console.error("UTR attachment upload error:", error);
-      throw error; // re-throw so caller can show error
+      console.error(`UTR attachment upload error (${UTR_DOCS_LIBRARY}):`, error);
+      throw error;
     }
   };
 
@@ -273,7 +319,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     setUtrFiles(updated);
   };
 
-  // ✅ Approve (Paid)
+  // Approve (Paid)
   const handleApprove = async () => {
     if (actionLock.current) return;
     if (isSubmitting) return;
@@ -300,12 +346,12 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         return;
       }
 
-      // ✅ Upload UTR attachments first (if any)
+      // Upload UTR attachments to CapexPaymentUTRDocs (if any new files were picked)
       if (utrFiles.length > 0) {
         try {
           await uploadUTRAttachments(itemData.CapexId);
         } catch {
-          await Swal.fire({ icon: "error", title: "Upload Failed", text: "UTR attachment upload failed. Please try again.", confirmButtonText: "OK" });
+          await Swal.fire({ icon: "error", title: "Upload Failed", text: `UTR attachment upload to ${UTR_DOCS_LIBRARY} failed. Please try again.`, confirmButtonText: "OK" });
           setIsSubmitting(false);
           return;
         }
@@ -348,10 +394,11 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   };
 
-  // ✅ Send Back
+  // Send Back
   const handleSendBack = async () => {
     if (actionLock.current) return;
     if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       if (!UTRRemarks || UTRRemarks.trim() === "") {
         await Swal.fire({ icon: "warning", title: "Validation Error", text: "Please enter UTR Remarks.", confirmButtonText: "OK" });
@@ -396,10 +443,11 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   };
 
-  // ✅ Reject
+  // Reject
   const handleReject = async () => {
     if (actionLock.current) return;
     if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       if (!UTRRemarks || UTRRemarks.trim() === "") {
         await Swal.fire({ icon: "warning", title: "Validation Error", text: "Please enter UTR Remarks.", confirmButtonText: "OK" });
@@ -632,13 +680,11 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                 </div>
               </div>
 
-              {/* Upload Document — existing attachments + UTR fields + optional new upload */}
+              {/* Upload Document - Requestor Attachments, from CapexPaymentDocs */}
               <div className="heading1">
                 <label>Upload Document</label>
               </div>
               <div className="main-formcontainer">
-
-                {/* Row 1: Existing attachments + UTR Date + UTR Number */}
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Attachments</label>
@@ -656,6 +702,15 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       </ul>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* UTR Details Section — everything here writes to / reads from CapexPaymentUTRDocs only */}
+              <div className="heading1">
+                <label>UTR Details</label>
+              </div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">UTR Date</label>
                     <input
@@ -674,10 +729,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       onChange={(e) => setUTRNumber(e.target.value)}
                     />
                   </div>
-                </div>
-
-                {/* Row 2: UTR Remarks + Optional UTR attachment upload */}
-                <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">UTR Remarks</label>
                     <input
@@ -686,15 +737,11 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       onChange={(e) => setUTRRemarks(e.target.value)}
                     />
                   </div>
+                </div>
 
-                  {/* ✅ NEW: Optional UTR attachment field */}
+                <div className="row mb-20">
                   <div className="col-md-8">
-                    <label className="font">
-                      UTR Attachments&nbsp;
-                      <span style={{ fontWeight: "normal", color: "#666", fontSize: "12px" }}>
-                        (Optional)
-                      </span>
-                    </label>
+                    <label className="font">UTR Attachments</label>
                     <input
                       type="file"
                       multiple
@@ -708,39 +755,63 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                         }
                       }}
                     />
-                    {/* Preview of selected UTR files */}
+
+                    {/* Files already persisted in CapexPaymentUTRDocs */}
+                    {savedUtrAttachments.length > 0 && (
+                      <>
+                        <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
+                          Already saved:
+                        </p>
+                        <ul style={{ marginBottom: "8px" }}>
+                          {savedUtrAttachments.map((file: any, index: number) => (
+                            <li key={`saved-${index}`}>
+                              <a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">
+                                {file.Name}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+
+                    {/* Files picked but not yet uploaded */}
                     {utrFiles.length > 0 && (
-                      <ul style={{ marginTop: "8px", paddingLeft: "0", listStyle: "none" }}>
-                        {utrFiles.map((file: File, index: number) => (
-                          <li
-                            key={index}
-                            style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}
-                          >
-                            <a
-                              href={URL.createObjectURL(file)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ fontSize: "13px" }}
+                      <>
+                        <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
+                          Pending upload:
+                        </p>
+                        <ul style={{ marginTop: "0", paddingLeft: "0", listStyle: "none" }}>
+                          {utrFiles.map((file: File, index: number) => (
+                            <li
+                              key={index}
+                              style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}
                             >
-                              {file.name}
-                            </a>
-                            <button
-                              type="button"
-                              style={{
-                                color: "red",
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "12px",
-                                padding: "0",
-                              }}
-                              onClick={() => handleRemoveUTRFile(index)}
-                            >
-                              Remove
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                              <a
+                                href={URL.createObjectURL(file)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: "13px" }}
+                              >
+                                {file.name}
+                              </a>
+                              <button
+                                type="button"
+                                style={{
+                                  color: "red",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  padding: "0",
+                                }}
+                                onClick={() => handleRemoveUTRFile(index)}
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </div>
                 </div>

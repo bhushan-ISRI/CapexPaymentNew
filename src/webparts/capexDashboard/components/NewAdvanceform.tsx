@@ -3,7 +3,6 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import logo from "../assets/sona-comstarlogo.png";
 import Swal from "sweetalert2";
@@ -25,7 +24,7 @@ interface IPreviousAdvance {
 }
 
 const NewAdvanceform = ({ context, onClose }: any) => {
-  const navigate = useNavigate();
+  // ✅ REMOVED: useNavigate() — form is a child component, not a route
   const submitRef = useRef(false);
   const draftRef = useRef(false);
   const sp = spfi().using(SPFx(context));
@@ -352,7 +351,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         text: "Submitted successfully.",
         confirmButtonText: "OK",
       });
-      navigate("/User");
+      onClose();
     } catch (error: any) {
       console.error("FULL ERROR:", error);
       await Swal.fire({
@@ -377,7 +376,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
       const WorkflowHistory = [
         {
           CurrentApprover: employee.EmployeeName,
-          ActionTaken: "Draft Saved",
           Comment: requesterRemarks || "",
           Date: new Date().toISOString(),
         },
@@ -422,7 +420,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         text: "Draft saved successfully.",
         confirmButtonText: "OK",
       });
-      navigate("/User");
+      onClose();
     } catch (error) {
       console.error("ERROR:", error);
       await Swal.fire({
@@ -724,7 +722,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                           color: "#fff",
                           padding: "6px 14px",
                           borderRadius: "4px",
-                          border: "none", 
+                          border: "none",
                           fontSize: "14px",
                           cursor: "pointer",
                           display: "inline-block",
@@ -912,13 +910,13 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                     >
                       {isDraftSaving ? "Saving..." : "Save as Draft"}
                     </button>
-                    <a
-                      href="#"
-                      onClick={() => navigate("/User")}
+                    <button
+                      type="button"
+                      onClick={onClose}
                       className="reset-btn"
                     >
                       Exit
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>

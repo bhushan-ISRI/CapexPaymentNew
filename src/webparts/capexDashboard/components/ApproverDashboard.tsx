@@ -17,9 +17,7 @@ interface UserDashboardProps {
 
 const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const sp = spfi().using(SPFx(context));
-  const [formType, setFormType] = useState<"new" | "view" | "approve" | null>(
-    null,
-  );
+  const [formType, setFormType] = useState<"new" | "view" | "approve" | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -40,81 +38,13 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     }
   };
 
-  const handleFormOpen = async (item: any, type: "view" | "approve") => {
-    try {
-      debugger;
-      const fullItem = await sp.web.lists
-        .getByTitle("CapexPayment")
-        .items.getById(item.ID)
-        .select(
-          "*",
-          "ID",
-          "Title",
-          "EmployeeCode",
-          "EmployeeName",
-          "Email",
-          "Division",
-          "Location",
-          "ContactNo",
-          "EmployeeStatus",
-          "RM",
-          "HOD",
-          "CapexId",
-          "VendorName",
-          "VendorCode",
-          "PONumber",
-          "PODate",
-          "POAmount",
-          "POPaymentTerms",
-          "MRNNumber",
-          "MRNDtae",
-          "MRNAmountwithGST",
-          "RequestedAmountforPayment",
-          "FinalPaymentAgainstPO",
-          "InstallationDetails",
-          "Status",
-          "Author/EMail",
-        )
-        .expand("Author")();
-
-      const mappedData = {
-        ...fullItem,
-        EmployeeEmail: fullItem.EmployeeEmail,
-        POAmtGST: fullItem.POAmount,
-        POAdvanceTerms: fullItem.POPaymentTerms,
-        mrnNumber: fullItem.MRNNumber,
-        mrnDate: fullItem.MRNDtae,
-        mrnAmount: fullItem.MRNAmountwithGST,
-        requestedAmount: fullItem.RequestedAmountforPayment,
-        finalPayment: fullItem.FinalPaymentAgainstPO,
-        installationDetails: fullItem.InstallationDetails,
-        ReportingManager: fullItem.ReportingManager,
-        HOD: fullItem.HOD,
-        ApprovalMatrix: fullItem.ApprovalMatrix
-          ? JSON.parse(fullItem.ApprovalMatrix)
-          : null,
-        WorkflowHistory: fullItem.WorkflowHistory
-          ? JSON.parse(fullItem.WorkflowHistory)
-          : null,
-      };
-
-      setSelectedItem(mappedData);
-      setFormType(type);
-      setShowForm(true);
-    } catch (error) {
-      console.error("Form open error:", error);
-    }
-  };
-
   const handleApproveClick = async (item: any) => {
-    debugger;
     try {
       const fullItem = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.getById(item.ID)
         .select("*", "Author/EMail")
         .expand("Author")();
-
       setSelectedItem(fullItem);
       setFormType("approve");
       setShowForm(true);
@@ -130,7 +60,6 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         .items.getById(item.ID)
         .select("*", "Author/EMail")
         .expand("Author")();
-
       setSelectedItem(fullItem);
       setFormType("view");
       setShowForm(true);
@@ -138,53 +67,26 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       console.error("View error:", error);
     }
   };
-//GetData 
+
   const getCapexData = async () => {
     try {
       const currentUser = await sp.web.currentUser();
       let filterQuery = "";
 
       if (activeMenu === "My Request") {
-        filterQuery = `
-    Status eq 'Pending for Approval'
-    and CurrentApproverId eq ${currentUser.Id}
-  `
-          .replace(/\n/g, "") 
-          .trim();
+        filterQuery = `Status eq 'Pending for Approval' and CurrentApproverId eq ${currentUser.Id}`;
       } else if (activeMenu === "Paid") {
-        filterQuery = `
-    Status eq 'Paid'
-    and CurrentApproverId eq ${currentUser.Id}
-  `
-          .replace(/\n/g, "")
-          .trim();
+        filterQuery = `Status eq 'Paid' and CurrentApproverId eq ${currentUser.Id}`;
       } else if (activeMenu === "Rejected") {
-        filterQuery = `
-    Status eq 'Reject'
-    and CurrentApproverId eq ${currentUser.Id}
-  `
-          .replace(/\n/g, "")
-          .trim();
+        filterQuery = `Status eq 'Reject' and CurrentApproverId eq ${currentUser.Id}`;
       }
 
       const items = await sp.web.lists
         .getByTitle("CapexPayment")
         .items.select(
-          "*",
-          "ID",
-          "Title",
-          "Created",
-          "EmployeeName",
-          "VendorName",
-          "VendorCode",
-          "PONumber",
-          "RequestedAmountforPayment",
-          "Status",
-          "CurrentApproverId",
-          "CurrentApprover/Title",
-          "CurrentApprover/EMail",
-          "PendingWth",
-          "Author/EMail",
+          "*", "ID", "Title", "Created", "EmployeeName", "VendorName", "VendorCode",
+          "PONumber", "RequestedAmountforPayment", "Status", "CurrentApproverId",
+          "CurrentApprover/Title", "CurrentApprover/EMail", "PendingWth", "Author/EMail",
         )
         .expand("Author", "CurrentApprover")
         .filter(filterQuery)
@@ -193,9 +95,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       const formatted = items.map((item: any) => ({
         ID: item.ID,
         id: item.Title,
-        date: item.Created
-          ? new Date(item.Created).toLocaleDateString("en-GB")
-          : "",
+        date: item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : "",
         EmployeeName: item.EmployeeName || "",
         vendor: item.VendorName || "",
         vendorCode: item.VendorCode || "",
@@ -216,13 +116,8 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     const status = statusFilter.toLowerCase();
 
     let menuFilter = true;
-    if (activeMenu === "Paid") {
-      menuFilter = item.status?.toLowerCase() === "paid";
-    } else if (activeMenu === "Rejected") {
-      menuFilter = item.status?.toLowerCase() === "reject";
-    } else if (activeMenu === "My Request") {
-      menuFilter = true;
-    }
+    if (activeMenu === "Paid") menuFilter = item.status?.toLowerCase() === "paid";
+    else if (activeMenu === "Rejected") menuFilter = item.status?.toLowerCase() === "reject";
 
     return (
       menuFilter &&
@@ -235,8 +130,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
   React.useEffect(() => {
     if (!context) return;
@@ -251,7 +145,16 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   if (showForm) {
     if (formType === "approve") {
       return (
-        <ApproverAdvanceForm context={context} itemId={selectedItem?.ID} />
+        <ApproverAdvanceForm
+          context={context}
+          itemId={selectedItem?.ID}
+          // ✅ ADDED: onClose prop — was completely missing before
+          onClose={() => {
+            setShowForm(false);
+            setFormType(null);
+            void getCapexData();
+          }}
+        />
       );
     }
     if (formType === "view") {
@@ -274,68 +177,44 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
       <div style={{ display: "flex", width: "100%" }}>
         <div className="sidebar">
           <div className="sidehead">
-            <div className="logo">
-              <img src={logo} width="25px" height="25px" />
-            </div>
+            <div className="logo"><img src={logo} width="25px" height="25px" /></div>
             <div className="sidehead-right">SONA COMSTAR</div>
           </div>
 
           <div className="sidehead-user">
-            <img
-              src={User}
-              style={{ margin: "10px 20px" }}
-              width={20}
-              height={20}
-            />
+            <img src={User} style={{ margin: "10px 20px" }} width={20} height={20} />
             {currentUserName}
           </div>
 
           <ul className="nav">
             <li className="nav-item">
               <a
-                className={
-                  activeMenu === "My Request" ? "nav-link active" : "nav-link"
-                }
+                className={activeMenu === "My Request" ? "nav-link active" : "nav-link"}
                 onClick={() => setActiveMenu("My Request")}
                 style={{ cursor: "pointer" }}
-              >
-                My Request
-              </a>
+              >My Request</a>
             </li>
             <li className="nav-item">
               <a
-                className={
-                  activeMenu === "Paid" ? "nav-link active" : "nav-link"
-                }
+                className={activeMenu === "Paid" ? "nav-link active" : "nav-link"}
                 onClick={() => setActiveMenu("Paid")}
                 style={{ cursor: "pointer" }}
-              >
-                Paid
-              </a>
+              >Paid</a>
             </li>
             <li className="nav-item">
               <a
-                className={
-                  activeMenu === "Rejected" ? "nav-link active" : "nav-link"
-                }
+                className={activeMenu === "Rejected" ? "nav-link active" : "nav-link"}
                 onClick={() => setActiveMenu("Rejected")}
                 style={{ cursor: "pointer" }}
-              >
-                Rejected
-              </a>
+              >Rejected</a>
             </li>
           </ul>
         </div>
 
-        <div
-          className="main"
-          style={{ width: "calc(100% - 250px)", transition: "width 0.3s" }}
-        >
+        <div className="main" style={{ width: "calc(100% - 250px)", transition: "width 0.3s" }}>
           <div className="header">
             <div className="left-banner">
-              <div className="logo-text">
-                <h2>CAPEX Payment Approver Dashboard</h2>
-              </div>
+              <div className="logo-text"><h2>CAPEX Payment Approver Dashboard</h2></div>
             </div>
           </div>
 
@@ -350,26 +229,16 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
               />
             </div>
             <div>
-              <select
-                value={statusFilter}
-                className="formtext-control"
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
+              <select value={statusFilter} className="formtext-control" onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">All</option>
-                <option value="Pending for Approval">
-                  Pending for Approval
-                </option>
+                <option value="Pending for Approval">Pending for Approval</option>
                 <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
                 <option value="Send Back">Send Back</option>
                 <option value="Draft">Draft</option>
-                <option value="Pending for Vouching Update">
-                  Pending for Vouching Update
-                </option>
+                <option value="Pending for Vouching Update">Pending for Vouching Update</option>
                 <option value="Paid">Paid</option>
-                <option value="Pending for UTR Update">
-                  Pending for UTR Update
-                </option>
+                <option value="Pending for UTR Update">Pending for UTR Update</option>
               </select>
             </div>
           </div>
@@ -378,10 +247,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
             <div style={{ overflowX: "auto" }}>
               <div className="table-vert-scroll">
                 <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
-                  <thead
-                    className="text-white"
-                    style={{ backgroundColor: "rgb(60, 62, 69)" }}
-                  >
+                  <thead className="text-white" style={{ backgroundColor: "rgb(60, 62, 69)" }}>
                     <tr>
                       <th className="px-4 py-2">Action</th>
                       <th className="px-4 py-2">Payment ID</th>
@@ -398,32 +264,18 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                   </thead>
                   <tbody>
                     {paginatedData.length === 0 ? (
-                      <tr>
-                        <td colSpan={11} style={{ textAlign: "center" }}>
-                          No Data
-                        </td>
-                      </tr>
+                      <tr><td colSpan={11} style={{ textAlign: "center" }}>No Data</td></tr>
                     ) : (
                       paginatedData.map((item, i) => (
                         <tr key={i}>
                           <td className="px-4 py-2">
-                            {(activeMenu === "Paid" ||
-                              activeMenu === "Rejected") && (
-                              <span
-                                onClick={() => handleViewClick(item)}
-                                style={{
-                                  cursor: "pointer",
-                                  marginRight: "10px",
-                                }}
-                              >
+                            {(activeMenu === "Paid" || activeMenu === "Rejected") && (
+                              <span onClick={() => handleViewClick(item)} style={{ cursor: "pointer", marginRight: "10px" }}>
                                 <img src={View} width={15} alt="View" />
                               </span>
                             )}
                             {activeMenu === "My Request" && (
-                              <span
-                                onClick={() => handleApproveClick(item)}
-                                style={{ cursor: "pointer" }}
-                              >
+                              <span onClick={() => handleApproveClick(item)} style={{ cursor: "pointer" }}>
                                 <img src={Edit} width={15} alt="Edit" />
                               </span>
                             )}
@@ -436,9 +288,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                           <td className="px-4 py-2">{item.vendor}</td>
                           <td className="px-4 py-2">{item.po}</td>
                           <td className="px-4 py-2">₹ {item.amount}</td>
-                          <td className="px-4 py-2">
-                            {item.pendingWith || "-"}
-                          </td>{" "}
+                          <td className="px-4 py-2">{item.pendingWith || "-"}</td>
                           <td className="px-4 py-2">{item.status}</td>
                         </tr>
                       ))
@@ -446,30 +296,10 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                   </tbody>
                 </table>
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginTop: "15px",
-                  }}
-                >
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    Previous
-                  </button>
-                  <span>
-                    Page {currentPage} of {totalPages || 1}
-                  </span>
-                  <button
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next
-                  </button>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "15px" }}>
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>Previous</button>
+                  <span>Page {currentPage} of {totalPages || 1}</span>
+                  <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(currentPage + 1)}>Next</button>
                 </div>
               </div>
             </div>

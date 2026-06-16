@@ -22,8 +22,17 @@ interface IPreviousAdvance {
   Status: string;
 }
 
+// Library names kept as constants so requestor docs and UTR docs can never
+// accidentally be pointed at the same library again.
+const REQUESTOR_DOCS_LIBRARY = "CapexPaymentDocs";
+const UTR_DOCS_LIBRARY = "CapexPaymentUTRDocs";
+
 const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
+  // Requestor attachments (root folder files only) - from CapexPaymentDocs
   const [attachments, setAttachments] = useState<any[]>([]);
+  // UTR attachments - from CapexPaymentUTRDocs ONLY
+  const [utrAttachments, setUtrAttachments] = useState<any[]>([]);
+
   const sp = spfi().using(SPFx(context));
   const [employee, setEmployee] = useState<any>({});
   const [vendors, setVendors] = useState<IVendor[]>([]);
@@ -47,6 +56,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const [VouchingNumber, setVouchingNumber] = useState("");
   const [UTRDate, setUTRDate] = useState("");
   const [UTRNumber, setUTRNumber] = useState("");
+  const [UTRRemarks, setUTRRemarks] = useState("");
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
@@ -69,14 +79,43 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
+  // Requestor attachments — ALWAYS from CapexPaymentDocs, never from the UTR library
   const getAttachments = async (capexId: string) => {
     try {
       if (!capexId) return;
       const safeCapexId = capexId.replace(/\//g, "_");
-      const folderPath = `/sites/SonaFinance/CapexPaymentDocs/${safeCapexId}`;
+      const libraryRootFolder = await sp.web.lists
+        .getByTitle(REQUESTOR_DOCS_LIBRARY)
+        .rootFolder();
+      const folderPath = `${libraryRootFolder.ServerRelativeUrl}/${safeCapexId}`;
       const files = await sp.web.getFolderByServerRelativePath(folderPath).files();
       setAttachments(files || []);
-    } catch { setAttachments([]); }
+    } catch (error) {
+      console.log(`No requestor attachments found in ${REQUESTOR_DOCS_LIBRARY} for ${capexId}`, error);
+      setAttachments([]);
+    }
+  };
+
+  // UTR attachments — ALWAYS from CapexPaymentUTRDocs, never from the requestor docs library.
+  // This folder only exists once the AP Performer has uploaded UTR proof, so a missing
+  // folder is expected/normal and is swallowed silently (empty list shown in UI).
+  const getUTRAttachments = async (capexId: string) => {
+    try {
+      if (!capexId) return;
+      const safeCapexId = capexId.replace(/\//g, "_");
+
+      const libraryRootFolder = await sp.web.lists
+        .getByTitle(UTR_DOCS_LIBRARY)
+        .rootFolder();
+
+      const utrFolderPath = `${libraryRootFolder.ServerRelativeUrl}/${safeCapexId}`;
+      const files = await sp.web.getFolderByServerRelativePath(utrFolderPath).files();
+      setUtrAttachments(files || []);
+    } catch (error) {
+      // Folder won't exist until AP Performer uploads UTR docs — safe to ignore
+      console.log(`No UTR attachments found in ${UTR_DOCS_LIBRARY} for ${capexId}`, error);
+      setUtrAttachments([]);
+    }
   };
 
   const getVendors = async () => {
@@ -117,13 +156,20 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     setVouchingNumber(formData.VoucherNumber || "");
     setUTRDate(formData.UTRDate?.split("T")[0] || "");
     setUTRNumber(formData.UTRNumber || "");
-    if (formData.CapexId) void getAttachments(formData.CapexId);
+    setUTRRemarks(formData.UTRRemarks || "");
+
+    if (formData.CapexId) {
+      void getAttachments(formData.CapexId);     // -> CapexPaymentDocs
+      void getUTRAttachments(formData.CapexId);  // -> CapexPaymentUTRDocs
+    }
+
     if (formData?.ApprovalMatrix) {
       try {
         const parsed = typeof formData.ApprovalMatrix === "string" ? JSON.parse(formData.ApprovalMatrix) : formData.ApprovalMatrix;
         setApprovalMatrix(Array.isArray(parsed) ? parsed : []);
       } catch { setApprovalMatrix([]); }
     } else { setApprovalMatrix([]); }
+
     if (formData?.WorkflowHistory) {
       try {
         const parsed = typeof formData.WorkflowHistory === "string" ? JSON.parse(formData.WorkflowHistory) : formData.WorkflowHistory;
@@ -146,7 +192,6 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const handleExit = () => { if (onClose) onClose(); else window.location.reload(); };
 
-  // ✅ Helper: resolve step CSS class based on status
   const getStepClass = (status: string) => {
     switch (status) {
       case "In Progress": return "active";
@@ -290,17 +335,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             </div>
           </div>
 
-          <div className="main-formcontainer" style={{ marginTop: "10px" }}>
-            <div className="row mb-20">
-              <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
-              <div className="col-md-6"><label className="font">Voucher Number</label> : &nbsp;&nbsp;<label className="fonttext">{VouchingNumber}</label></div>
-            </div>
-            <div className="row mb-20">
-              <div className="col-md-6"><label className="font">UTR Date</label> : &nbsp;&nbsp;<label className="fonttext">{UTRDate}</label></div>
-              <div className="col-md-6"><label className="font">UTR Number</label> : &nbsp;&nbsp;<label className="fonttext">{UTRNumber}</label></div>
-            </div>
-          </div>
-
+          {/* Requestor Attachments — root folder only, from CapexPaymentDocs */}
           <div className="heading1" style={{ marginTop: "10px" }}><label>Upload Document</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">
@@ -311,6 +346,37 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                     <li key={index}><a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">{file.Name}</a></li>
                   ))}</ul>
                 ) : <p>No attachments</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Voucher Detail's */}
+          <div className="main-formcontainer" style={{ marginTop: "10px" }}>
+            <div className="row mb-20">
+              <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
+              <div className="col-md-6"><label className="font">Voucher Number</label> : &nbsp;&nbsp;<label className="fonttext">{VouchingNumber}</label></div>
+            </div>
+          </div>
+
+          <div className="heading1" style={{ marginTop: "10px" }}><label>UTR Details</label></div>
+          <div className="main-formcontainer">
+            <div className="row mb-20">
+              <div className="col-md-4"><label className="font">UTR Date</label> : &nbsp;&nbsp;<label className="fonttext">{UTRDate}</label></div>
+              <div className="col-md-4"><label className="font">UTR Number</label> : &nbsp;&nbsp;<label className="fonttext">{UTRNumber}</label></div>
+              <div className="col-md-4"><label className="font">UTR Remarks</label> : &nbsp;&nbsp;<label className="fonttext">{UTRRemarks}</label></div>
+            </div>
+            <div className="row mb-20">
+              <div className="col-md-4">
+                <label className="font">UTR Attachments</label>
+                {utrAttachments.length > 0 ? (
+                  <ul>{utrAttachments.map((file: any, index: number) => (
+                    <li key={index}>
+                      <a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">
+                        {file.Name}
+                      </a>
+                    </li>
+                  ))}</ul>
+                ) : <p>No UTR attachments</p>}
               </div>
             </div>
           </div>
@@ -360,4 +426,4 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   );
 };
 
-export default ViewAdvanceForm;
+export default ViewAdvanceForm; 
