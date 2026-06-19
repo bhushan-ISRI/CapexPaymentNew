@@ -3,7 +3,6 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState } from "react";
-// ✅ REMOVED: useNavigate import
 import { IPeoplePickerContext } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import {
   PeoplePicker,
@@ -16,7 +15,7 @@ import Swal from "sweetalert2";
 interface IProps {
   context: any;
   itemId: number;
-  onClose: () => void; // ✅ ADDED: onClose prop
+  onClose: () => void;
 }
 
 interface IVendor {
@@ -27,7 +26,6 @@ interface IVendor {
 
 const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => {
   const sp = spfi().using(SPFx(context));
-  // ✅ REMOVED: const navigate = useNavigate();
   const actionLock = React.useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [employee, setEmployee] = React.useState<any>({});
@@ -194,7 +192,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
         WorkflowHistory: JSON.stringify(history),
       });
       await Swal.fire({ icon: "success", title: "Success", text: "Approved successfully.", confirmButtonText: "OK" });
-      // ✅ FIX: use onClose() instead of navigate("/Approver")
       onClose();
     } catch (error) {
       console.error(error);
@@ -245,7 +242,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
         WorkflowHistory: JSON.stringify(history),
       });
       await Swal.fire({ icon: "success", title: "Success", text: "Send Back successfully.", confirmButtonText: "OK" });
-      // ✅ FIX: use onClose() instead of navigate("/Approver")
       onClose();
     } catch (error) {
       console.error(error);
@@ -290,7 +286,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
         WorkflowHistory: JSON.stringify(history),
       });
       await Swal.fire({ icon: "success", title: "Success", text: "Rejected successfully.", confirmButtonText: "OK" });
-      // ✅ FIX: use onClose() instead of navigate("/Approver")
       onClose();
     } catch (error) {
       console.error(error);
@@ -301,8 +296,71 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
     }
   };
 
-  // ✅ FIX: Exit also uses onClose()
   const handleExit = () => onClose();
+
+  // ===== Ribbon color logic =====
+  // Driven by the overall item Status, not each step's own Status string.
+  // Rules:
+  //   Paid        → Initiator + all approver steps = green
+  //   Reject      → step with Status "Reject"/"Rejected" = red;
+  //                 steps before it = green; steps after = yellow
+  //   Send Back   → Initiator = orange (send-back target);
+  //                 all approver steps = yellow
+  //   Default     → already-Approved steps = green;
+  //                 the In Progress step = orange (current approver);
+  //                 remaining steps = yellow
+  const overallStatus: string = itemData?.Status || "";
+
+  const buildRibbonSteps = () => {
+    const initiatorStep = {
+      Role: "Initiator",
+      Name: itemData?.EmployeeName || "",
+      Status: "Approved",
+    };
+    const approverSteps = approvalMatrix.filter((a) => a.Role !== "Initiator");
+    const steps = [initiatorStep, ...approverSteps];
+
+    if (overallStatus === "Paid") {
+      return steps.map((s) => ({ ...s, _color: "approved" }));
+    }
+
+    if (overallStatus === "Reject") {
+      const rejectIndex = steps.findIndex(
+        (s) => s.Status === "Reject" || s.Status === "Rejected",
+      );
+      return steps.map((s, idx) => {
+        if (rejectIndex === -1) return { ...s, _color: "" };
+        if (idx === rejectIndex) return { ...s, _color: "rejected" };
+        if (idx < rejectIndex) return { ...s, _color: "approved" };
+        return { ...s, _color: "upcoming" };
+      });
+    }
+
+    if (overallStatus === "Send Back") {
+      return steps.map((s) =>
+        s.Role === "Initiator"
+          ? { ...s, _color: "active" }
+          : { ...s, _color: "upcoming" },
+      );
+    }
+
+    // Default: in-progress (Pending for Approval, etc.)
+    return steps.map((s) => {
+      if (s.Status === "Approved") return { ...s, _color: "approved" };
+      if (s.Status === "In Progress") return { ...s, _color: "active" };
+      return { ...s, _color: "upcoming" };
+    });
+  };
+
+  const getStepClass = (color: string) => {
+    switch (color) {
+      case "approved": return "approved";   // green
+      case "active":   return "active";     // orange — current approver / send-back target
+      case "upcoming": return "upcoming";   // yellow — not yet reached
+      case "rejected": return "rejected";   // red
+      default: return "";
+    }
+  };
 
   if (!itemData) return <div>Loading...</div>;
 
@@ -320,17 +378,10 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
             ) : (
               <div className="displayWF">
                 <ul className="approval-flow">
-                  <li className="approval-step">
-                    {`Initiator`} - {itemData?.EmployeeName}
-                  </li>
-                  {approvalMatrix.map((a, index) => (
+                  {buildRibbonSteps().map((a, index) => (
                     <li
                       key={index}
-                      className={`approval-step ${
-                        a.Status === "In Progress" ? "active" :
-                        a.Status === "Approved" ? "approved" :
-                        a.Status === "Reject" ? "reject" : ""
-                      }`}
+                      className={`approval-step ${getStepClass(a._color)}`}
                     >
                       {a.Role} - {a.Name}
                     </li>
@@ -404,10 +455,10 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
                     </div>
                     {itemData?.FinalPaymentAgainstPO && (
                       <div className="row mb-20">
-                        <div className="col-md-6">
+                        {/* <div className="col-md-6">
                           <label className="font">Installation Details</label> : &nbsp;&nbsp;
                           <label className="fonttext">{itemData?.InstallationDetails}</label>
-                        </div>
+                        </div> */}
                       </div>
                     )}
                   </div>

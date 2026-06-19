@@ -37,9 +37,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
   const sp = spfi().using(SPFx(context));
   const [previousAdvances, setPreviousAdvances] = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
-  // Files already saved in CapexPaymentUTRDocs (loaded on open, refreshed after upload)
   const [savedUtrAttachments, setSavedUtrAttachments] = useState<any[]>([]);
-  // Files picked locally but not yet uploaded
   const [utrFiles, setUtrFiles] = useState<File[]>([]);
   const today = new Date();
   const localDate: string = new Date(
@@ -123,7 +121,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   };
 
-  // Requestor attachments — ALWAYS from CapexPaymentDocs
   const getAttachments = async (capexId: string) => {
     try {
       const safe = capexId.replace(/\//g, "_");
@@ -139,8 +136,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   };
 
-  // UTR attachments already saved — ALWAYS read from CapexPaymentUTRDocs ONLY.
-  // Folder may not exist yet on first UTR submission, which is expected.
   const getSavedUTRAttachments = async (capexId: string) => {
     try {
       const safe = capexId.replace(/\//g, "_");
@@ -216,8 +211,8 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       setSelectedVendorName(item?.VendorName || "");
 
       if (item.CapexId) {
-        await getAttachments(item.CapexId);           // -> CapexPaymentDocs
-        await getSavedUTRAttachments(item.CapexId);    // -> CapexPaymentUTRDocs
+        await getAttachments(item.CapexId);
+        await getSavedUTRAttachments(item.CapexId);
       }
 
       if (item.ApprovalMatrix) {
@@ -268,8 +263,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     }
   }, [selectedVendorId]);
 
-  // Upload UTR attachments to CapexPaymentUTRDocs ONLY, under a folder named by capexId.
-  // Never touches CapexPaymentDocs.
   const uploadUTRAttachments = async (capexId: string) => {
     if (!utrFiles || utrFiles.length === 0) return;
     try {
@@ -282,7 +275,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       const libraryServerRelativeUrl = libraryRootFolder.ServerRelativeUrl;
       const utrFolderPath = `${libraryServerRelativeUrl}/${safe}`;
 
-      // Ensure the folder exists in CapexPaymentUTRDocs — create it if not
       let folderExists = true;
       try {
         await sp.web.getFolderByServerRelativePath(utrFolderPath)();
@@ -295,7 +287,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           .folders.addUsingPath(safe);
       }
 
-      // Upload each file into the CapexPaymentUTRDocs/<capexId> folder
       for (const file of utrFiles) {
         const arrayBuffer = await file.arrayBuffer();
         await sp.web
@@ -303,9 +294,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           .files.addUsingPath(file.name, arrayBuffer, { Overwrite: true });
       }
 
-      // Refresh the saved list from CapexPaymentUTRDocs so UI reflects what's actually stored
       await getSavedUTRAttachments(capexId);
-      // Clear the local pending-upload queue now that they're persisted
       setUtrFiles([]);
     } catch (error) {
       console.error(`UTR attachment upload error (${UTR_DOCS_LIBRARY}):`, error);
@@ -317,6 +306,70 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     const updated = [...utrFiles];
     updated.splice(index, 1);
     setUtrFiles(updated);
+  };
+
+  // ===== Ribbon color logic =====
+  // Driven by the overall item Status, not each step's own Status string.
+  // Rules:
+  //   Paid        → Initiator + all approver steps = green
+  //   Reject      → step with Status "Reject"/"Rejected" = red;
+  //                 steps before it = green; steps after = yellow
+  //   Send Back   → Initiator = orange (send-back target);
+  //                 all approver steps = yellow
+  //   Default     → already-Approved steps = green;
+  //                 the In Progress step = orange (current approver);
+  //                 remaining steps = yellow
+  const overallStatus: string = itemData?.Status || "";
+
+  const buildRibbonSteps = () => {
+    const initiatorStep = {
+      Role: "Initiator",
+      Name: itemData?.EmployeeName || "",
+      Status: "Approved",
+    };
+    const approverSteps = approvalMatrix.filter((a) => a.Role !== "Initiator");
+    const steps = [initiatorStep, ...approverSteps];
+
+    if (overallStatus === "Paid") {
+      return steps.map((s) => ({ ...s, _color: "approved" }));
+    }
+
+    if (overallStatus === "Reject") {
+      const rejectIndex = steps.findIndex(
+        (s) => s.Status === "Reject" || s.Status === "Rejected",
+      );
+      return steps.map((s, idx) => {
+        if (rejectIndex === -1) return { ...s, _color: "" };
+        if (idx === rejectIndex) return { ...s, _color: "rejected" };
+        if (idx < rejectIndex) return { ...s, _color: "approved" };
+        return { ...s, _color: "upcoming" };
+      });
+    }
+
+    if (overallStatus === "Send Back") {
+      return steps.map((s) =>
+        s.Role === "Initiator"
+          ? { ...s, _color: "active" }
+          : { ...s, _color: "upcoming" },
+      );
+    }
+
+    // Default: in-progress (Pending for UTR Update, etc.)
+    return steps.map((s) => {
+      if (s.Status === "Approved") return { ...s, _color: "approved" };
+      if (s.Status === "In Progress") return { ...s, _color: "active" };
+      return { ...s, _color: "upcoming" };
+    });
+  };
+
+  const getStepClass = (color: string) => {
+    switch (color) {
+      case "approved": return "approved";   // green
+      case "active":   return "active";     // orange — current approver / send-back target
+      case "upcoming": return "upcoming";   // yellow — not yet reached
+      case "rejected": return "rejected";   // red
+      default: return "";
+    }
   };
 
   // Approve (Paid)
@@ -345,20 +398,16 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         setIsSubmitting(false);
         return;
       }
-      // approverRemarks is optional here, but if something was typed it must
-      // not be pure whitespace (e.g. user hits spacebar a few times).
       if (approverRemarks && approverRemarks.trim() === "") {
         await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
         setIsSubmitting(false);
         return;
       }
 
-      // Normalize to trimmed values so nothing whitespace-padded gets persisted.
       const trimmedUTRNumber = UTRNumber.trim();
       const trimmedUTRRemarks = UTRRemarks.trim();
       const trimmedApproverRemarks = approverRemarks.trim();
 
-      // Upload UTR attachments to CapexPaymentUTRDocs (if any new files were picked)
       if (utrFiles.length > 0) {
         try {
           await uploadUTRAttachments(itemData.CapexId);
@@ -540,23 +589,10 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
             ) : (
               <div className="displayWF">
                 <ul className="approval-flow">
-                  <li className="approval-step">
-                    {`Initiator`} - {itemData?.EmployeeName}
-                  </li>
-                  {approvalMatrix.map((a, index) => (
+                  {buildRibbonSteps().map((a, index) => (
                     <li
                       key={index}
-                      className={`approval-step ${
-                        a.Status === "In Progress"
-                          ? "active"
-                          : a.Status === "Approved"
-                            ? "approved"
-                            : a.Status === "Reject"
-                              ? "reject"
-                              : a.Status === "Send Back"
-                                ? "sendback"
-                                : ""
-                      }`}
+                      className={`approval-step ${getStepClass(a._color)}`}
                     >
                       {a.Role} - {a.Name}
                     </li>
@@ -731,7 +767,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                 </div>
               </div>
 
-              {/* UTR Details Section — everything here writes to / reads from CapexPaymentUTRDocs only */}
+              {/* UTR Details Section */}
               <div className="heading1">
                 <label>UTR Details</label>
               </div>
@@ -782,7 +818,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       }}
                     />
 
-                    {/* Files already persisted in CapexPaymentUTRDocs */}
                     {savedUtrAttachments.length > 0 && (
                       <>
                         <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
@@ -800,7 +835,6 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       </>
                     )}
 
-                    {/* Files picked but not yet uploaded */}
                     {utrFiles.length > 0 && (
                       <>
                         <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
@@ -826,7 +860,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                                   color: "red",
                                   background: "none",
                                   border: "none",
-                                  cursor: "pointer", 
+                                  cursor: "pointer",
                                   fontSize: "12px",
                                   padding: "0",
                                 }}
