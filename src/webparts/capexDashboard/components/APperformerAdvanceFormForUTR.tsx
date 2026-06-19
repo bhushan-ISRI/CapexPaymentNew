@@ -826,7 +826,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                                   color: "red",
                                   background: "none",
                                   border: "none",
-                                  cursor: "pointer",
+                                  cursor: "pointer", 
                                   fontSize: "12px",
                                   padding: "0",
                                 }}
