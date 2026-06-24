@@ -3,7 +3,6 @@ import "./advanced.scss";
 import { spfi } from "@pnp/sp";
 import { SPFx } from "@pnp/sp/presets/all";
 import { useEffect, useState, useRef } from "react";
-// REMOVED: useNavigate import — not needed, form is a child component
 import logo from "../assets/sona-comstarlogo.png";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
@@ -42,14 +41,12 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [mrnNumber, setMrnNumber] = useState("");
   const [mrnDate, setMrnDate] = useState("");
-  // MRN Amount split fields (Total MRN Amount is derived/computed below)
   const [mrnBasicAmount, setMrnBasicAmount] = useState("");
   const [mrnGstAmount, setMrnGstAmount] = useState("");
   const [mrnOtherAmount, setMrnOtherAmount] = useState("");
   const [requestedAmount, setRequestedAmount] = useState("");
   const [finalPayment, setFinalPayment] = useState("");
   const [installationDetails, setInstallationDetails] = useState("");
-  // Shown when "Whether this is the Final Payment against the PO" = No
   const [installationRequestNumber, setInstallationRequestNumber] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [selectedVendorName, setSelectedVendorName] = useState("");
@@ -57,7 +54,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const [poNumber, setPoNumber] = useState("");
   const [poDate, setPoDate] = useState("");
   const [poTerms, setPoTerms] = useState("");
-  // PO Amount split fields (Total PO Amount is derived/computed below)
   const [poBasicAmount, setPoBasicAmount] = useState("");
   const [poGstAmount, setPoGstAmount] = useState("");
   const [poOtherAmount, setPoOtherAmount] = useState("");
@@ -65,7 +61,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
-  // Derived totals - sum of basic, GST & other amount
   const totalPoAmount =
     (Number(poBasicAmount) || 0) +
     (Number(poGstAmount) || 0) +
@@ -75,6 +70,10 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     (Number(mrnBasicAmount) || 0) +
     (Number(mrnGstAmount) || 0) +
     (Number(mrnOtherAmount) || 0);
+
+  // For Double columns: empty string → null, never ""
+  const toDouble = (val: string): number | null =>
+    val && val.trim() !== "" ? parseFloat(val) : null;
 
   const handleNumberChange = (value: string, setter: any) => {
     const regex = /^\d*\.?\d*$/;
@@ -229,8 +228,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     if (
       finalPayment === "No" &&
       (!installationRequestNumber || installationRequestNumber.trim() === "")
-    )
-      errors.push("Please enter Installation Request Number");
+    ) errors.push("Please enter Installation Request Number");
     if ((!attachments || attachments.length === 0) && (!selectedFiles || selectedFiles.length === 0))
       errors.push("Please upload at least one attachment");
     if (requestedAmount && totalMrnAmount && Number(requestedAmount) > totalMrnAmount)
@@ -238,8 +236,55 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     return errors;
   };
 
+  // Shared payload builder for both Submit and Draft
+  const buildPayload = (flow: any[], status: string, history: any[], isDraft: boolean) => {
+    const currentApproverId = flow.length > 0 ? flow[0].Id : null;
+    const poTotal = totalPoAmount || null;
+    const mrnTotal = totalMrnAmount || null;
+    return {
+      Title: formData.CapexId,
+      CapexId: formData.CapexId,
+      EmployeeCode: employee.EmployeeCode || null,
+      EmployeeName: employee.EmployeeName || null,
+      Division: employee.Division || null,
+      Location: employee.Location || null,
+      Email: employee.EmployeeEmail || null,
+      RM: employee.ReportingManager?.Title || null,
+      HOD: employee.HOD?.Title || null,
+      ContactNo: employee.ContactNo || null,
+      EmployeeStatus: employee.EmployeeStatus || null,
+      VendorCode: selectedVendorCode || null,
+      VendorName: selectedVendorName || null,
+      PONumber: poNumber || null,
+      PODate: poDate ? new Date(poDate) : null,
+      POPaymentTerms: poTerms || null,
+      // Draft: null when empty. Submit: parsed float (validation already ensures non-empty)
+      POBasicAmount: isDraft ? toDouble(poBasicAmount) : parseFloat(poBasicAmount),
+      POGSTAmount: isDraft ? toDouble(poGstAmount) : parseFloat(poGstAmount),
+      POOtherAmount: isDraft ? toDouble(poOtherAmount) : parseFloat(poOtherAmount),
+      POAmount: poTotal !== null ? poTotal.toString() : null,
+      MRNNumber: mrnNumber || null,
+      MRNDtae: mrnDate ? new Date(mrnDate) : null,
+      MRNBasicAmount: isDraft ? toDouble(mrnBasicAmount) : parseFloat(mrnBasicAmount),
+      MRNGSTAmount: isDraft ? toDouble(mrnGstAmount) : parseFloat(mrnGstAmount),
+      MRNOtherAmount: isDraft ? toDouble(mrnOtherAmount) : parseFloat(mrnOtherAmount),
+      MRNAmountwithGST: mrnTotal !== null ? mrnTotal.toString() : null,
+      RequestedAmountforPayment: requestedAmount ? requestedAmount.toString() : null,
+      FinalPaymentAgainstPO: finalPayment === "Yes" ? true : finalPayment === "No" ? false : null,
+      InstallationDetails: installationDetails || null,
+      InstallationRequestNumber: finalPayment === "No" ? installationRequestNumber || null : null,
+      RequesterRemarks: requesterRemarks || null,
+      StatusFlow: status,
+      Status: status,
+      ApprovalMatrix: JSON.stringify(flow),
+      CurrentApproverId: currentApproverId,
+      WorkflowHistory: JSON.stringify(history),
+    };
+  };
+
   const handleSubmit = async () => {
     if (submitRef.current) return;
+    submitRef.current = true;
     setIsSubmitting(true);
     try {
       const errors = validateForm();
@@ -259,59 +304,22 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         Comment: requesterRemarks,
         Date: new Date().toISOString(),
       });
-
-      // Rebuild the approval flow from scratch via buildApprovalFlow(), same as
-      // NewAdvanceform's handleSubmit. This guarantees CurrentApproverId is always
-      // assigned (RM if present, else HOD, else first matrix approver) instead of
-      // reusing a stale/stranded ApprovalMatrix + CurrentApproverId left over from
-      // a prior Send Back, where the previous approach could leave it unassigned.
       const flow = await buildApprovalFlow();
-      const currentApproverId = flow.length > 0 ? flow[0].Id : null;
-
-      await sp.web.lists.getByTitle("CapexPayment").items.getById(formData.ID).update({
-        Title: formData.CapexId,
-        CapexId: formData.CapexId,
-        EmployeeCode: employee.EmployeeCode,
-        EmployeeName: employee.EmployeeName,
-        Division: employee.Division,
-        Location: employee.Location,
-        Email: employee.EmployeeEmail,
-        RM: employee.ReportingManager?.Title,
-        HOD: employee.HOD?.Title,
-        ContactNo: employee.ContactNo,
-        EmployeeStatus: employee.EmployeeStatus,
-        VendorCode: selectedVendorCode,
-        VendorName: selectedVendorName,
-        PONumber: poNumber,
-        PODate: poDate ? new Date(poDate) : null,
-        POPaymentTerms: poTerms,
-        POBasicAmount: poBasicAmount ? poBasicAmount.toString() : "",
-        POGSTAmount: poGstAmount ? poGstAmount.toString() : "",
-        POOtherAmount: poOtherAmount ? poOtherAmount.toString() : "",
-        POAmount: totalPoAmount ? totalPoAmount.toString() : "",
-        MRNNumber: mrnNumber,
-        MRNDtae: mrnDate ? new Date(mrnDate) : null,
-        MRNBasicAmount: mrnBasicAmount ? mrnBasicAmount.toString() : "",
-        MRNGSTAmount: mrnGstAmount ? mrnGstAmount.toString() : "",
-        MRNOtherAmount: mrnOtherAmount ? mrnOtherAmount.toString() : "",
-        MRNAmountwithGST: totalMrnAmount ? totalMrnAmount.toString() : "",
-        RequestedAmountforPayment: requestedAmount ? requestedAmount.toString() : "",
-        FinalPaymentAgainstPO: finalPayment === "Yes",
-        InstallationDetails: installationDetails,
-        InstallationRequestNumber: finalPayment === "No" ? installationRequestNumber : "",
-        RequesterRemarks: requesterRemarks,
-        StatusFlow: "Pending for Approval",
-        Status: "Pending for Approval",
-        ApprovalMatrix: JSON.stringify(flow),
-        CurrentApproverId: currentApproverId,
-        WorkflowHistory: JSON.stringify(history),
-      });
+      await sp.web.lists
+        .getByTitle("CapexPayment")
+        .items.getById(formData.ID)
+        .update(buildPayload(flow, "Pending for Approval", history, false));
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Updated successfully.", confirmButtonText: "OK" });
       onClose();
     } catch (error: any) {
       console.error("FULL ERROR:", error);
-      await Swal.fire({ icon: "error", title: "Update Failed", text: error?.data?.responseBody || "Error while saving.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: error?.data?.responseBody || error?.message || "Error while saving.",
+        confirmButtonText: "OK",
+      });
     } finally {
       submitRef.current = false;
       setIsSubmitting(false);
@@ -319,62 +327,33 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   };
 
   const handledraft = async () => {
-    if (isDraftSaving) return;
+    if (draftRef.current) return;
+    draftRef.current = true;
     setIsDraftSaving(true);
     try {
       const flow = await buildApprovalFlow();
       flow.forEach((f: any) => (f.Status = "Pending"));
-      const currentApprover = flow.length > 0 ? flow[0].Id : null;
       const history = formData.WorkflowHistory ? JSON.parse(formData.WorkflowHistory) : [];
       history.push({
         CurrentApprover: employee.EmployeeName,
         Comment: requesterRemarks || "",
         Date: new Date().toISOString(),
       });
-      await sp.web.lists.getByTitle("CapexPayment").items.getById(formData.ID).update({
-        Title: formData.CapexId,
-        CapexId: formData.CapexId,
-        EmployeeCode: employee.EmployeeCode,
-        EmployeeName: employee.EmployeeName,
-        Division: employee.Division,
-        Location: employee.Location,
-        Email: employee.EmployeeEmail,
-        RM: employee.ReportingManager?.Title,
-        HOD: employee.HOD?.Title,
-        ContactNo: employee.ContactNo,
-        EmployeeStatus: employee.EmployeeStatus,
-        VendorCode: selectedVendorCode,
-        VendorName: selectedVendorName,
-        PONumber: poNumber,
-        PODate: poDate ? new Date(poDate) : null,
-        POPaymentTerms: poTerms,
-        POBasicAmount: poBasicAmount ? poBasicAmount.toString() : "",
-        POGSTAmount: poGstAmount ? poGstAmount.toString() : "",
-        POOtherAmount: poOtherAmount ? poOtherAmount.toString() : "",
-        POAmount: totalPoAmount ? totalPoAmount.toString() : "",
-        MRNNumber: mrnNumber,
-        MRNDtae: mrnDate ? new Date(mrnDate) : null,
-        MRNBasicAmount: mrnBasicAmount ? mrnBasicAmount.toString() : "",
-        MRNGSTAmount: mrnGstAmount ? mrnGstAmount.toString() : "",
-        MRNOtherAmount: mrnOtherAmount ? mrnOtherAmount.toString() : "",
-        MRNAmountwithGST: totalMrnAmount ? totalMrnAmount.toString() : "",
-        RequestedAmountforPayment: requestedAmount ? requestedAmount.toString() : "",
-        FinalPaymentAgainstPO: finalPayment === "Yes",
-        InstallationDetails: installationDetails,
-        InstallationRequestNumber: finalPayment === "No" ? installationRequestNumber : "",
-        RequesterRemarks: requesterRemarks,
-        StatusFlow: "Draft",
-        Status: "Draft",
-        ApprovalMatrix: JSON.stringify(flow),
-        CurrentApproverId: currentApprover,
-        WorkflowHistory: JSON.stringify(history),
-      });
+      await sp.web.lists
+        .getByTitle("CapexPayment")
+        .items.getById(formData.ID)
+        .update(buildPayload(flow, "Draft", history, true));
       if (selectedFiles.length > 0) await uploadFiles();
       await Swal.fire({ icon: "success", title: "Success", text: "Draft saved successfully.", confirmButtonText: "OK" });
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("ERROR:", error);
-      await Swal.fire({ icon: "error", title: "Save Failed", text: "Error while saving.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: error?.data?.responseBody || error?.message || "Error while saving.",
+        confirmButtonText: "OK",
+      });
     } finally {
       draftRef.current = false;
       setIsDraftSaving(false);
@@ -386,10 +365,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     setPoNumber(formData.PONumber || "");
     setPoDate(formData.PODate?.split("T")[0] || "");
     setPoTerms(formData.POPaymentTerms || "");
-    // Coerce to string: these are Number columns in SharePoint, so formData
-    // returns real JS numbers (e.g. 5000, not "5000"). Leaving them as numbers
-    // crashes validateForm()'s `.trim()` checks ("Ce.trim is not a function").
-    // Using != null (not ||) so a genuine 0 isn't wiped out to "".
     setPoBasicAmount(formData.POBasicAmount != null ? String(formData.POBasicAmount) : "");
     setPoGstAmount(formData.POGSTAmount != null ? String(formData.POGSTAmount) : "");
     setPoOtherAmount(formData.POOtherAmount != null ? String(formData.POOtherAmount) : "");
@@ -408,13 +383,17 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     if (formData.CapexId) void getAttachments(formData.CapexId);
     if (formData?.ApprovalMatrix) {
       try {
-        const parsed = typeof formData.ApprovalMatrix === "string" ? JSON.parse(formData.ApprovalMatrix) : formData.ApprovalMatrix;
+        const parsed = typeof formData.ApprovalMatrix === "string"
+          ? JSON.parse(formData.ApprovalMatrix)
+          : formData.ApprovalMatrix;
         setApprovalMatrix(Array.isArray(parsed) ? parsed : []);
       } catch { setApprovalMatrix([]); }
     } else { setApprovalMatrix([]); }
     if (formData?.WorkflowHistory) {
       try {
-        const parsed = typeof formData.WorkflowHistory === "string" ? JSON.parse(formData.WorkflowHistory) : formData.WorkflowHistory;
+        const parsed = typeof formData.WorkflowHistory === "string"
+          ? JSON.parse(formData.WorkflowHistory)
+          : formData.WorkflowHistory;
         setWorkflowHistory(Array.isArray(parsed) ? parsed : []);
       } catch { setWorkflowHistory([]); }
     } else { setWorkflowHistory([]); }
@@ -436,20 +415,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     void getVendors();
   }, []);
 
-  // ===== Ribbon color logic (same rules as ViewAdvanceForm) =====
-  // Colors: "approved" = green, "active" = orange (current approver / send-back target),
-  // "upcoming" = yellow, "rejected" = red. Driven by the overall request Status
-  // (formData.Status) plus each step's own Status inside approvalMatrix.
-  //
-  // Rules:
-  // - Paid: Initiator + every approver step = green.
-  // - Reject: the step with Status "Reject"/"Rejected" = red; steps before it = green;
-  //   steps after it = yellow.
-  // - Send Back / Draft: the requester is the active step (orange) — for Send Back
-  //   because CurrentApprover is cleared, for Draft because it hasn't been
-  //   submitted yet — and every approver step is upcoming (yellow), never green.
-  // - Otherwise (still in progress, e.g. Pending for Approval): steps already
-  //   Approved = green, the step with Status "In Progress" = orange, steps after = yellow.
   const overallStatus: string = formData?.Status || "";
 
   const buildRibbonSteps = () => {
@@ -464,7 +429,6 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     if (overallStatus === "Paid") {
       return steps.map((s) => ({ ...s, _color: "approved" }));
     }
-
     if (overallStatus === "Reject") {
       const rejectIndex = steps.findIndex((s) => s.Status === "Reject" || s.Status === "Rejected");
       return steps.map((s, idx) => {
@@ -474,17 +438,11 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         return { ...s, _color: "upcoming" };
       });
     }
-
     if (overallStatus === "Send Back" || overallStatus === "Draft") {
-      // Draft: the request hasn't been submitted yet, so the requester is still
-      // the active step (orange), not "done" (green) — nothing downstream has
-      // started, so every approver step is upcoming (yellow).
       return steps.map((s) =>
         s.Role === "Initiator" ? { ...s, _color: "active" } : { ...s, _color: "upcoming" },
       );
     }
-
-    // Default: still in progress (Pending for Approval, etc.)
     return steps.map((s) => {
       if (s.Status === "Approved") return { ...s, _color: "approved" };
       if (s.Status === "In Progress") return { ...s, _color: "active" };
@@ -494,18 +452,13 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";   // green
-      case "active": return "active";       // orange — current approver / send-back target
-      case "upcoming": return "upcoming";   // yellow — not yet reached
-      case "rejected": return "rejected";   // red
+      case "approved": return "approved";
+      case "active": return "active";
+      case "upcoming": return "upcoming";
+      case "rejected": return "rejected";
       default: return "";
     }
   };
-  // Add these rules to advanced.scss if not already present:
-  //   .approval-step.approved { background-color: green; color: #fff; }
-  //   .approval-step.active   { background-color: orange; color: #fff; }
-  //   .approval-step.upcoming { background-color: #f5d800; color: #333; }
-  //   .approval-step.rejected { background-color: red; color: #fff; }
 
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
@@ -633,7 +586,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                     <input value={mrnOtherAmount} onChange={(e) => handleNumberChange(e.target.value, setMrnOtherAmount)} className="form-control" />
                   </div>
                   <div className="col-md-4">
-                    <label className="font">Total MRN Amount</label>
+                    <label className="font">MRNAmount including GST</label>
                     <input value={totalMrnAmount ? totalMrnAmount.toFixed(2) : ""} className="form-control readonly" readOnly />
                   </div>
                 </div>
@@ -645,7 +598,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                 </div>
               </div>
 
-              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Advances</label></div>
+              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Payment Details</label></div>
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-12">
@@ -776,7 +729,12 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
                         ))}
                       </ul>
                     )}
-                    <input type="file" multiple className="form-control" onChange={(e) => { if (e.target.files) setSelectedFiles(Array.from(e.target.files)); }} />
+                    <input
+                      type="file"
+                      multiple
+                      className="form-control"
+                      onChange={(e) => { if (e.target.files) setSelectedFiles(Array.from(e.target.files)); }}
+                    />
                   </div>
                 </div>
               </div>

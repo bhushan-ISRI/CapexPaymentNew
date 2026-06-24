@@ -741,7 +741,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                     <label className="fonttext">{itemData?.MRNOtherAmount}</label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">Total MRN Amount</label> : &nbsp;&nbsp;
+                    <label className="font">MRNAmount including GST</label> : &nbsp;&nbsp;
                     <label className="fonttext">{itemData?.MRNAmountwithGST}</label>
                   </div>
                 </div>
@@ -753,7 +753,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                 </div>
               </div>
 
-              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Advances</label></div>
+              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Payment Details</label></div>
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-12">

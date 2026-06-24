@@ -311,14 +311,14 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             <div className="row mb-20">
               <div className="col-md-4"><label className="font">MRN GST Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnGstAmount}</label></div>
               <div className="col-md-4"><label className="font">MRN Other Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnOtherAmount}</label></div>
-              <div className="col-md-4"><label className="font">Total MRN Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnAmount}</label></div>
+              <div className="col-md-4"><label className="font">MRNAmount including GST</label> : &nbsp;&nbsp;<label className="fonttext">{mrnAmount}</label></div>
             </div>
             <div className="row mb-20">
               <div className="col-md-4"><label className="font">Requested Amount</label> : &nbsp;&nbsp;<label className="fonttext">{requestedAmount}</label></div>
             </div>
           </div>
 
-          <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Advances</label></div>
+          <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Payment Details</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">
               <div className="col-md-12">

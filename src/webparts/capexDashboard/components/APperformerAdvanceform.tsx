@@ -776,7 +776,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                     </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">Total MRN Amount</label> :
+                    <label className="font">MRNAmount including GST</label> :
                     &nbsp;&nbsp;
                     <label className="fonttext">
                       {itemData?.MRNAmountwithGST}
@@ -795,7 +795,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
               </div>
 
               <div className="heading1" style={{ marginTop: "10px" }}>
-                <label>Previous Advances</label>
+                <label>Previous Payment Details</label>
               </div>
               <div className="main-formcontainer">
                 <div className="row mb-20">
