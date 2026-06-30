@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import logo from "../assets/sona-comstarlogo.png";
 import Swal from "sweetalert2";
+import { SPHttpClient, ISPHttpClientOptions } from '@microsoft/sp-http';
 
 interface IVendor {
   Id: number;
@@ -63,6 +64,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
   const vendorDropdownRef = useRef<HTMLDivElement>(null);
   const vendorSearchRef = useRef<HTMLInputElement>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const filteredVendors = vendors.filter(
     (v) =>
@@ -134,36 +136,254 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     }
   };
 
+  // const getLoggedInUser = async () => {
+  //   try {
+  //     const currentUser = await sp.web.currentUser();
+  //     const email = currentUser.Email;
+  //     const user = await sp.web.lists
+  //       .getByTitle("EmployeeMaster")
+  //       .items.select(
+  //         "EmployeeCode",
+  //         "EmployeeName",
+  //         "Division",
+  //         "Location",
+  //         "EmployeeEmail",
+  //         "ReportingManager/Title",
+  //         "ReportingManager/Id",
+  //         "HOD/Title",
+  //         "HOD/Id",
+  //         "ContactNo",
+  //         "EmployeeStatus",
+  //         "CostCenter",
+  //       )
+  //       .expand("ReportingManager", "HOD")
+  //       .filter(`EmployeeEmail eq '${email}'`)
+  //       .top(1)();
+  //     if (user.length > 0) {
+  //       setEmployee(user[0]);
+  //       employeeRef.current = user[0];
+  //       buildApprovalPreview(user[0]);
+  //     }
+  //   } catch (error) {
+  //     console.log("Error fetching user:", error);
+  //   }
+  // };
+
+  const ensureUser = async (email: string): Promise<number> => {
+
+    if (!email) return 0;
+
+    try {
+
+      const webUrl = context.pageContext.web.absoluteUrl;
+
+      const response = await context.spHttpClient.post(
+        `${webUrl}/_api/web/ensureuser`,
+        SPHttpClient.configurations.v1,
+        {
+          headers: {
+            "Accept": "application/json;odata=nometadata",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            logonName: email
+          })
+        }
+      );
+
+      if (!response.ok) {
+
+        console.log("ensureUser failed for:", email);
+
+        return 0;
+      }
+
+      const data = await response.json();
+
+      return data.Id || 0;
+
+    } catch (error) {
+
+      console.log("ensureUser error:", email, error);
+
+      return 0;
+    }
+  };
   const getLoggedInUser = async () => {
     try {
-      const currentUser = await sp.web.currentUser();
-      const email = currentUser.Email;
-      const user = await sp.web.lists
-        .getByTitle("EmployeeMaster")
-        .items.select(
-          "EmployeeCode",
-          "EmployeeName",
-          "Division",
-          "Location",
-          "EmployeeEmail",
-          "ReportingManager/Title",
-          "ReportingManager/Id",
-          "HOD/Title",
-          "HOD/Id",
-          "ContactNo",
-          "EmployeeStatus",
-          "CostCenter",
-        )
-        .expand("ReportingManager", "HOD")
-        .filter(`EmployeeEmail eq '${email}'`)
-        .top(1)();
-      if (user.length > 0) {
-        setEmployee(user[0]);
-        employeeRef.current = user[0];
-        buildApprovalPreview(user[0]);
+      const toTitleCase = (str: string): string => {
+        if (!str) return "";
+
+        return str
+          .toLowerCase()
+          .split(" ")
+          .filter(Boolean)
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+      };
+
+      const cleanLocationForDisplay = (location: string): string => {
+        if (!location) return "";
+        return location.replace(/^re\s+/i, "").trim();
+      };
+
+      const FLOW_URL =
+        "https://defaultcb1edbfe8080457d9cae51528f3643.3f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e2bb522aa41443179a72b701b9613471/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=q8b8ADCtK2eKr2f6p3MX7gxmJymPeJbm0mq2M69Rk8E";
+
+      const fetchPage = async (pageNumber: number) => {
+        const response = await fetch(FLOW_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            PageSize: 500,
+            PageNumber: pageNumber,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch employee data");
+        }
+
+        return response.json();
+      };
+
+      const currentUserEmail =
+        context.pageContext.user.email.toLowerCase();
+
+      let employee: any = null;
+      let page = 1;
+
+      while (true) {
+        const res = await fetchPage(page);
+
+        const employees = res?.data?.employees || [];
+
+        employee = employees.find(
+          (x: any) => x.email?.toLowerCase() === currentUserEmail
+        );
+
+        if (employee) break;
+
+        if (employees.length < 500) break;
+
+        page++;
       }
+
+      if (!employee) {
+        console.log("Employee not found.");
+        return;
+      }
+
+      const attributes = employee.attributes || [];
+
+      const locationAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "location"
+      );
+
+      const departmentAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "department"
+      );
+
+      const hodEmailAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "hod_email"
+      );
+
+      const hodNameAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "hod name"
+      );
+
+      let rmUserId = 0;
+      let hodUserId = 0;
+
+      try {
+        if (employee.reportingManagerEmail) {
+          rmUserId = await ensureUser(employee.reportingManagerEmail);
+        }
+
+        if (hodEmailAttr?.attributeTypeUnitDescription) {
+          hodUserId = await ensureUser(
+            hodEmailAttr.attributeTypeUnitDescription
+          );
+        }
+      } catch (err) {
+        console.log("ensureUser error:", err);
+      }
+
+      employeeRef.current = {
+        EmployeeCode: employee.employeeCode || "",
+        EmployeeName: toTitleCase(employee.employeeName || ""),
+        Division: departmentAttr?.attributeTypeUnitDescription || "",
+        Location: cleanLocationForDisplay(
+          locationAttr?.attributeTypeUnitDescription || ""
+        ),
+        EmployeeEmail: employee.email || "",
+        ContactNo: employee.mobileNo || "",
+        EmployeeStatus: employee.employeeStatus || "",
+        CostCenter: employee.costCenter || "",
+
+        ReportingManager: {
+          Id: rmUserId,
+          Title: employee.reportingManagerName || "",
+        },
+
+        HOD: {
+          Id: hodUserId,
+          Title: hodNameAttr?.attributeTypeUnitDescription || "",
+        },
+      }
+
+      setEmployee({
+        EmployeeCode: employee.employeeCode || "",
+        EmployeeName: toTitleCase(employee.employeeName || ""),
+        Division: departmentAttr?.attributeTypeUnitDescription || "",
+        Location: cleanLocationForDisplay(
+          locationAttr?.attributeTypeUnitDescription || ""
+        ),
+        EmployeeEmail: employee.email || "",
+        ContactNo: employee.mobileNo || "",
+        EmployeeStatus: employee.employeeStatus || "",
+        CostCenter: employee.costCenter || "",
+
+        ReportingManager: {
+          Id: rmUserId,
+          Title: employee.reportingManagerName || "",
+        },
+
+        HOD: {
+          Id: hodUserId,
+          Title: hodNameAttr?.attributeTypeUnitDescription || "",
+        },
+      });
+      buildApprovalPreview({
+        EmployeeCode: employee.employeeCode || "",
+        EmployeeName: toTitleCase(employee.employeeName || ""),
+        Division: departmentAttr?.attributeTypeUnitDescription || "",
+        Location: cleanLocationForDisplay(
+          locationAttr?.attributeTypeUnitDescription || ""
+        ),
+        EmployeeEmail: employee.email || "",
+        ContactNo: employee.mobileNo || "",
+        EmployeeStatus: employee.employeeStatus || "",
+        CostCenter: employee.costCenter || "",
+
+        ReportingManager: {
+          Id: rmUserId,
+          Title: employee.reportingManagerName || "",
+        },
+
+        HOD: {
+          Id: hodUserId,
+          Title: hodNameAttr?.attributeTypeUnitDescription || "",
+        },
+      });
     } catch (error) {
-      console.log("Error fetching user:", error);
+      console.error("Error fetching user:", error);
     }
   };
 
@@ -232,9 +452,17 @@ const NewAdvanceform = ({ context, onClose }: any) => {
   const buildApprovalPreview = async (emp: any) => {
     const flow: any[] = [];
     if (emp.ReportingManager?.Title)
-      flow.push({ Name: emp.ReportingManager.Title, Role: "RM", Status: "Pending" });
+      flow.push({
+        Name: emp.ReportingManager.Title,
+        Role: "RM",
+        Status: "Pending"
+      });
     if (emp.HOD?.Title)
-      flow.push({ Name: emp.HOD.Title, Role: "HOD", Status: "Pending" });
+      flow.push({
+        Name: emp.HOD.Title,
+        Role: "HOD",
+        Status: "Pending"
+      });
     const matrixData = await sp.web.lists
       .getByTitle("CapexPaymentApprovalMatrix")
       .items.select("Role/RoleName,Approver/Title")
@@ -494,11 +722,33 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     }
   };
 
+  // React.useEffect(() => {
+  //   if (!context) return;
+  //   void getLoggedInUser();
+  //   void getVendors();
+  // }, [context]);
   React.useEffect(() => {
     if (!context) return;
-    void getLoggedInUser();
-    void getVendors();
+
+    void loadPage();
+
   }, [context]);
+
+  const loadPage = async () => {
+    try {
+      setPageLoading(true);
+
+      await Promise.all([
+        getLoggedInUser(),
+        getVendors(),
+        // getPaidPOs(),
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -520,6 +770,25 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     }
   }, [vendorDropdownOpen]);
 
+  if (pageLoading) {
+
+    return (
+
+      <div className="skeletonWrapper">
+        <div className="skeletonLine" style={{ width: "40%" }} />
+        <div className="skeletonLine" style={{ width: "80%" }} />
+
+        <div className="skeletonCard"></div>
+
+        <div className="keletonLine" style={{ width: "60%" }} />
+        <div className="skeletonCard"></div>
+
+        <div className="skeletonLine" style={{ width: "50%" }} />
+        <div className="skeletonCard"></div>
+      </div>
+
+    );
+  }
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row">
@@ -1035,7 +1304,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                                 const pending = Math.max(
                                   0,
                                   Number(item.RequestAdvanceAmount || 0) -
-                                    Number(item.PaidAmount || 0),
+                                  Number(item.PaidAmount || 0),
                                 );
                                 return (
                                   <tr key={index}>

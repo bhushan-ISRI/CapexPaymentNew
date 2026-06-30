@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import logo from "../assets/sona-comstarlogo.png";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Swal from "sweetalert2";
+import { SPHttpClient, ISPHttpClientOptions } from '@microsoft/sp-http';
 
 interface IVendor {
   Id: number;
@@ -65,6 +66,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
   const vendorDropdownRef = useRef<HTMLDivElement>(null);
   const vendorSearchRef = useRef<HTMLInputElement>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const filteredVendors = vendors.filter(
     (v) =>
@@ -121,23 +123,198 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
+  // const getLoggedInUser = async () => {
+  //   try {
+  //     const currentUser = await sp.web.currentUser();
+  //     const email = currentUser.Email;
+  //     const user = await sp.web.lists
+  //       .getByTitle("EmployeeMaster")
+  //       .items.select(
+  //         "EmployeeCode", "EmployeeName", "Division", "Location", "EmployeeEmail",
+  //         "ReportingManager/Title", "ReportingManager/Id",
+  //         "HOD/Title", "HOD/Id", "ContactNo", "EmployeeStatus", "CostCenter",
+  //       )
+  //       .expand("ReportingManager", "HOD")
+  //       .filter(`EmployeeEmail eq '${email}'`)
+  //       .top(1)();
+  //     if (user.length > 0) setEmployee(user[0]);
+  //   } catch (error) {
+  //     console.log("Error fetching user:", error);
+  //   }
+  // };
+  const ensureUser = async (email: string): Promise<number> => {
+
+    if (!email) return 0;
+
+    try {
+
+      const webUrl = context.pageContext.web.absoluteUrl;
+
+      const response = await context.spHttpClient.post(
+        `${webUrl}/_api/web/ensureuser`,
+        SPHttpClient.configurations.v1,
+        {
+          headers: {
+            "Accept": "application/json;odata=nometadata",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            logonName: email
+          })
+        }
+      );
+
+      if (!response.ok) {
+
+        console.log("ensureUser failed for:", email);
+
+        return 0;
+      }
+
+      const data = await response.json();
+
+      return data.Id || 0;
+
+    } catch (error) {
+
+      console.log("ensureUser error:", email, error);
+
+      return 0;
+    }
+  };
   const getLoggedInUser = async () => {
     try {
-      const currentUser = await sp.web.currentUser();
-      const email = currentUser.Email;
-      const user = await sp.web.lists
-        .getByTitle("EmployeeMaster")
-        .items.select(
-          "EmployeeCode", "EmployeeName", "Division", "Location", "EmployeeEmail",
-          "ReportingManager/Title", "ReportingManager/Id",
-          "HOD/Title", "HOD/Id", "ContactNo", "EmployeeStatus", "CostCenter",
-        )
-        .expand("ReportingManager", "HOD")
-        .filter(`EmployeeEmail eq '${email}'`)
-        .top(1)();
-      if (user.length > 0) setEmployee(user[0]);
+      const toTitleCase = (str: string): string => {
+        if (!str) return "";
+
+        return str
+          .toLowerCase()
+          .split(" ")
+          .filter(Boolean)
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+      };
+
+      const cleanLocationForDisplay = (location: string): string => {
+        if (!location) return "";
+        return location.replace(/^re\s+/i, "").trim();
+      };
+
+      const FLOW_URL =
+        "https://defaultcb1edbfe8080457d9cae51528f3643.3f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e2bb522aa41443179a72b701b9613471/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=q8b8ADCtK2eKr2f6p3MX7gxmJymPeJbm0mq2M69Rk8E";
+
+      const fetchPage = async (pageNumber: number) => {
+        const response = await fetch(FLOW_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            PageSize: 500,
+            PageNumber: pageNumber,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch employee data");
+        }
+
+        return response.json();
+      };
+
+      const currentUserEmail =
+        context.pageContext.user.email.toLowerCase();
+
+      let employee: any = null;
+      let page = 1;
+
+      while (true) {
+        const res = await fetchPage(page);
+
+        const employees = res?.data?.employees || [];
+
+        employee = employees.find(
+          (x: any) => x.email?.toLowerCase() === currentUserEmail
+        );
+
+        if (employee) break;
+
+        if (employees.length < 500) break;
+
+        page++;
+      }
+
+      if (!employee) {
+        console.log("Employee not found.");
+        return;
+      }
+
+      const attributes = employee.attributes || [];
+
+      const locationAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "location"
+      );
+
+      const departmentAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "department"
+      );
+
+      const hodEmailAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "hod_email"
+      );
+
+      const hodNameAttr = attributes.find(
+        (x: any) =>
+          x.attributeTypeDescription?.toLowerCase() === "hod name"
+      );
+
+      let rmUserId = 0;
+      let hodUserId = 0;
+
+      try {
+        if (employee.reportingManagerEmail) {
+          rmUserId = await ensureUser(employee.reportingManagerEmail);
+        }
+
+        if (hodEmailAttr?.attributeTypeUnitDescription) {
+          hodUserId = await ensureUser(
+            hodEmailAttr.attributeTypeUnitDescription
+          );
+        }
+      } catch (err) {
+        console.log("ensureUser error:", err);
+      }
+
+
+
+      setEmployee({
+        EmployeeCode: employee.employeeCode || "",
+        EmployeeName: toTitleCase(employee.employeeName || ""),
+        Division: departmentAttr?.attributeTypeUnitDescription || "",
+        Location: cleanLocationForDisplay(
+          locationAttr?.attributeTypeUnitDescription || ""
+        ),
+        EmployeeEmail: employee.email || "",
+        ContactNo: employee.mobileNo || "",
+        EmployeeStatus: employee.employeeStatus || "",
+        CostCenter: employee.costCenter || "",
+
+        ReportingManager: {
+          Id: rmUserId,
+          Title: employee.reportingManagerName || "",
+        },
+
+        HOD: {
+          Id: hodUserId,
+          Title: hodNameAttr?.attributeTypeUnitDescription || "",
+        },
+      });
+
     } catch (error) {
-      console.log("Error fetching user:", error);
+      console.error("Error fetching user:", error);
     }
   };
 
@@ -419,9 +596,23 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   }, [vendors, selectedVendorCode]);
 
   useEffect(() => {
-    void getLoggedInUser();
-    void getVendors();
-  }, []);
+  void loadPage();
+}, []);
+
+ const loadPage = async () => {
+  try {
+    setPageLoading(true);
+
+    await Promise.all([
+      getLoggedInUser(),
+      getVendors(),
+    ]);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setPageLoading(false);
+  }
+};
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -487,7 +678,47 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       default: return "";
     }
   };
+if (pageLoading) {
+  return (
+    <div className="MainUplodForm">
+      <div className="skeletonWrapper">
 
+        <div className="skeletonHeader"></div>
+
+        <div className="skeletonRibbon"></div>
+
+        {[1, 2, 3, 4, 5, 6].map((item) => (
+          <div className="skeletonSection" key={item}>
+            <div className="skeletonTitle"></div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <div className="skeletonInput"></div>
+              </div>
+
+              <div className="col-md-4">
+                <div className="skeletonInput"></div>
+              </div>
+
+              <div className="col-md-4">
+                <div className="skeletonInput"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div className="skeletonTable"></div>
+
+        <div className="skeletonButtonGroup">
+          <div className="skeletonButton"></div>
+          <div className="skeletonButton"></div>
+          <div className="skeletonButton"></div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row">
