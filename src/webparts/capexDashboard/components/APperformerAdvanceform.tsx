@@ -49,6 +49,8 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
   const [selectedVendorCode, setSelectedVendorCode] = useState(""); // FIX: plain text vendor code
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [vendors, setVendors] = useState<IVendor[]>([]);
+  const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
@@ -60,7 +62,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
 
   const getVendors = async () => {
     try {
-      const data = await sp.web.lists
+      const data = await vendorSp.web.lists
         .getByTitle("VendorMaster")
         .items.select("Id", "VendorCode", "VendorName")();
       setVendors(data);

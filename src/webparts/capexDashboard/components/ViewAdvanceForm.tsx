@@ -28,7 +28,8 @@ const UTR_DOCS_LIBRARY = "CapexPaymentUTRDocs";
 const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const [attachments, setAttachments] = useState<any[]>([]);
   const [utrAttachments, setUtrAttachments] = useState<any[]>([]);
-
+  const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
   const sp = spfi().using(SPFx(context));
   const [employee, setEmployee] = useState<any>({});
   const [vendors, setVendors] = useState<IVendor[]>([]);
@@ -147,7 +148,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const getVendors = async () => {
     try {
-      const data = await sp.web.lists
+      const data = await vendorSp.web.lists
         .getByTitle("VendorMaster")
         .items.select("Id", "VendorCode", "VendorName")();
       setVendors(data);

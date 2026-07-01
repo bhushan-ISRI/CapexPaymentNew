@@ -38,6 +38,8 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
   const [approverRemarks, setApproverRemarks] = useState("");
   const [attachments, setAttachments] = useState<any[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
+  const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
   const [itemData, setItemData] = useState<any>(null);
   const [mrnNumber, setMrnNumber] = useState("");
   const [mrnDate, setMrnDate] = useState("");
@@ -103,7 +105,7 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
 
   const getVendors = async () => {
     try {
-      const data = await sp.web.lists
+      const data = await vendorSp.web.lists
         .getByTitle("VendorMaster")
         .items.select("Id", "VendorCode", "VendorName")();
       setVendors(data);
