@@ -47,7 +47,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
   const [itemData, setItemData] = useState<any>(null);
   const [approverRemarks, setApproverRemarks] = useState("");
   const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
-  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(
+    SPFx(context),
+  );
   const [selectedVendorName, setSelectedVendorName] = useState("");
   const [selectedVendorCode, setSelectedVendorCode] = useState(""); // FIX: plain text vendor code
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
@@ -96,12 +98,21 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
 
   const getPreviousAdvances = async (vendorId: number) => {
     try {
-      if (!vendorId) { setPreviousAdvances([]); return; }
+      if (!vendorId) {
+        setPreviousAdvances([]);
+        return;
+      }
       const data = await sp.web.lists
         .getByTitle("CapexAdvance")
         .items.select(
-          "PONumber", "RequestAdvanceAmount", "Created",
-          "VoucherDate", "VouchingNumber", "PaidAmount", "Status", "VendorCode/Id",
+          "PONumber",
+          "RequestAdvanceAmount",
+          "Created",
+          "VoucherDate",
+          "VouchingNumber",
+          "PaidAmount",
+          "Status",
+          "VendorCode/Id",
         )
         .expand("VendorCode")
         .filter(`VendorCode/Id eq ${vendorId} and Status eq 'Paid'`)
@@ -123,7 +134,10 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       const files = await sp.web.getFolderByServerRelativePath(path).files();
       setAttachments(files || []);
     } catch (error) {
-      console.log(`No requestor attachments found in ${REQUESTOR_DOCS_LIBRARY}`, error);
+      console.log(
+        `No requestor attachments found in ${REQUESTOR_DOCS_LIBRARY}`,
+        error,
+      );
       setAttachments([]);
     }
   };
@@ -135,7 +149,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         .getByTitle(UTR_DOCS_LIBRARY)
         .rootFolder.select("ServerRelativeUrl")();
       const utrFolderPath = `${libraryRootFolder.ServerRelativeUrl}/${safe}`;
-      const files = await sp.web.getFolderByServerRelativePath(utrFolderPath).files();
+      const files = await sp.web
+        .getFolderByServerRelativePath(utrFolderPath)
+        .files();
       setSavedUtrAttachments(files || []);
     } catch (error) {
       console.log(`No UTR attachments found yet in ${UTR_DOCS_LIBRARY}`, error);
@@ -172,7 +188,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           "Location",
           "RM",
           "HOD",
-          "VendorCode",       // FIX: plain text field, no expand needed
+          "VendorCode", // FIX: plain text field, no expand needed
           "VendorName",
           "PODate",
           "POPaymentTerms",
@@ -300,7 +316,10 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       await getSavedUTRAttachments(capexId);
       setUtrFiles([]);
     } catch (error) {
-      console.error(`UTR attachment upload error (${UTR_DOCS_LIBRARY}):`, error);
+      console.error(
+        `UTR attachment upload error (${UTR_DOCS_LIBRARY}):`,
+        error,
+      );
       throw error;
     }
   };
@@ -355,11 +374,16 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";
-      case "active":   return "active";
-      case "upcoming": return "upcoming";
-      case "rejected": return "rejected";
-      default: return "";
+      case "approved":
+        return "approved";
+      case "active":
+        return "active";
+      case "upcoming":
+        return "upcoming";
+      case "rejected":
+        return "rejected";
+      default:
+        return "";
     }
   };
 
@@ -369,27 +393,52 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     setIsSubmitting(true);
     try {
       if (!UTRDate || UTRDate.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation", text: "Please enter UTR Date.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "Please enter UTR Date.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (UTRDate > localDate) {
-        await Swal.fire({ icon: "warning", title: "Validation", text: "UTR date cannot be a future date.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "UTR date cannot be a future date.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (!UTRNumber || UTRNumber.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation", text: "Please enter UTR Number.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation",
+          text: "Please enter UTR Number.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (!UTRRemarks || UTRRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Please enter UTR Remarks.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (approverRemarks && approverRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Approver Remarks cannot contain only spaces.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
@@ -402,7 +451,12 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         try {
           await uploadUTRAttachments(itemData.CapexId);
         } catch {
-          await Swal.fire({ icon: "error", title: "Upload Failed", text: `UTR attachment upload to ${UTR_DOCS_LIBRARY} failed. Please try again.`, confirmButtonText: "OK" });
+          await Swal.fire({
+            icon: "error",
+            title: "Upload Failed",
+            text: `UTR attachment upload to ${UTR_DOCS_LIBRARY} failed. Please try again.`,
+            confirmButtonText: "OK",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -435,11 +489,21 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           WorkflowHistory: JSON.stringify(history),
         });
 
-      await Swal.fire({ icon: "success", title: "Success", text: "Payment marked as Paid successfully.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Payment marked as Paid successfully.",
+        confirmButtonText: "OK",
+      });
       if (onClose) onClose();
     } catch (error) {
       console.error("Approve error:", error);
-      await Swal.fire({ icon: "error", title: "Error", text: "An error occurred while processing the payment.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while processing the payment.",
+        confirmButtonText: "OK",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -451,12 +515,22 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     setIsSubmitting(true);
     try {
       if (!UTRRemarks || UTRRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Please enter UTR Remarks.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (approverRemarks && approverRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Approver Remarks cannot contain only spaces.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
@@ -476,7 +550,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         Date: new Date().toISOString(),
       });
 
-      const flow = itemData.ApprovalMatrix ? JSON.parse(itemData.ApprovalMatrix) : [];
+      const flow = itemData.ApprovalMatrix
+        ? JSON.parse(itemData.ApprovalMatrix)
+        : [];
       const currentUserId = context.pageContext.legacyPageContext.userId;
       const currentIndex = flow.findIndex((a: any) => a.Id === currentUserId);
       if (currentIndex !== -1) flow[currentIndex].Status = "Send Back";
@@ -490,11 +566,21 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           WorkflowHistory: JSON.stringify(history),
         });
 
-      await Swal.fire({ icon: "success", title: "Success", text: "Request sent back successfully.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Request sent back successfully.",
+        confirmButtonText: "OK",
+      });
       if (onClose) onClose();
     } catch (error) {
       console.error(error);
-      await Swal.fire({ icon: "error", title: "Error", text: "An error occurred while sending the request back.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while sending the request back.",
+        confirmButtonText: "OK",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -506,12 +592,22 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
     setIsSubmitting(true);
     try {
       if (!UTRRemarks || UTRRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Please enter UTR Remarks.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Please enter UTR Remarks.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
       if (approverRemarks && approverRemarks.trim() === "") {
-        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        await Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: "Approver Remarks cannot contain only spaces.",
+          confirmButtonText: "OK",
+        });
         setIsSubmitting(false);
         return;
       }
@@ -531,7 +627,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         Date: new Date().toISOString(),
       });
 
-      const flow = itemData.ApprovalMatrix ? JSON.parse(itemData.ApprovalMatrix) : [];
+      const flow = itemData.ApprovalMatrix
+        ? JSON.parse(itemData.ApprovalMatrix)
+        : [];
       const currentUserId = context.pageContext.legacyPageContext.userId;
       const currentIndex = flow.findIndex((a: any) => a.Id === currentUserId);
       if (currentIndex !== -1) flow[currentIndex].Status = "Reject";
@@ -547,11 +645,21 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
           WorkflowHistory: JSON.stringify(history),
         });
 
-      await Swal.fire({ icon: "success", title: "Success", text: "Request rejected successfully.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Request rejected successfully.",
+        confirmButtonText: "OK",
+      });
       if (onClose) onClose();
     } catch (error) {
       console.error(error);
-      await Swal.fire({ icon: "error", title: "Error", text: "An error occurred while rejecting the request.", confirmButtonText: "OK" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "An error occurred while rejecting the request.",
+        confirmButtonText: "OK",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -596,43 +704,72 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label htmlFor="Employee Code" className="font">Employee Code</label> : &nbsp;&nbsp;
+                    <label htmlFor="Employee Code" className="font">
+                      Employee Code
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.EmployeeCode}</label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="Employee Name" className="font">Employee Name</label> : &nbsp;&nbsp;
+                    <label htmlFor="Employee Name" className="font">
+                      Employee Name
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.EmployeeName}</label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="Employee Email" className="font">Employee Email</label> : &nbsp;&nbsp;
+                    <label htmlFor="Employee Email" className="font">
+                      Employee Email
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.Email}</label>
                   </div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label htmlFor="Contact No" className="font">Contact No</label> : &nbsp;&nbsp;
+                    <label htmlFor="Contact No" className="font">
+                      Contact No
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.ContactNo}</label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="Employee Status" className="font">Employee Status</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData.EmployeeStatus}</label>
+                    <label htmlFor="Employee Status" className="font">
+                      Employee Status
+                    </label>{" "}
+                    : &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData.EmployeeStatus}
+                    </label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="Division" className="font">Division</label> : &nbsp;&nbsp;
+                    <label htmlFor="Division" className="font">
+                      Division
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.Division}</label>
                   </div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label htmlFor="Location" className="font">Location</label> : &nbsp;&nbsp;
+                    <label htmlFor="Location" className="font">
+                      Location
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.Location}</label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="RM" className="font">RM</label> : &nbsp;&nbsp;
+                    <label htmlFor="RM" className="font">
+                      RM
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.RM}</label>
                   </div>
                   <div className="col-md-4">
-                    <label htmlFor="HOD" className="font">HOD</label> : &nbsp;&nbsp;
+                    <label htmlFor="HOD" className="font">
+                      HOD
+                    </label>{" "}
+                    : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.HOD}</label>
                   </div>
                 </div>
@@ -660,15 +797,20 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                   <div className="col-md-4">
                     <label className="font">PO Date</label> : &nbsp;&nbsp;
                     <label className="fonttext">
-                      {itemData.PODate ? new Date(itemData.PODate).toLocaleDateString("en-GB") : ""}
+                      {itemData.PODate
+                        ? new Date(itemData.PODate).toLocaleDateString("en-GB")
+                        : ""}
                     </label>
                   </div>
                   <div className="col-md-4">
                     <label className="font">PO Terms</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData.POPaymentTerms}</label>
+                    <label className="fonttext">
+                      {itemData.POPaymentTerms}
+                    </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">PO Basic Amount</label> : &nbsp;&nbsp;
+                    <label className="font">PO Basic Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">{itemData.POBasicAmount}</label>
                   </div>
                 </div>
@@ -678,11 +820,13 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                     <label className="fonttext">{itemData.POGSTAmount}</label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">PO Other Amount</label> : &nbsp;&nbsp;
+                    <label className="font">PO Other Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">{itemData.POOtherAmount}</label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">Total PO Amount</label> : &nbsp;&nbsp;
+                    <label className="font">Total PO Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">{itemData.POAmount}</label>
                   </div>
                 </div>
@@ -695,19 +839,33 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Approver Remarks</label>
-                    <input value={itemData.ApproverRemarks || ""} className="font-control readonly" readOnly />
+                    <input
+                      value={itemData.ApproverRemarks || ""}
+                      className="font-control readonly"
+                      readOnly
+                    />
                   </div>
                   <div className="col-md-4">
                     <label className="font">Voucher Date</label>
                     <input
-                      value={itemData.VoucherDate ? new Date(itemData.VoucherDate).toLocaleDateString("en-GB") : ""}
+                      value={
+                        itemData.VoucherDate
+                          ? new Date(itemData.VoucherDate).toLocaleDateString(
+                              "en-GB",
+                            )
+                          : ""
+                      }
                       className="font-control readonly"
                       readOnly
                     />
                   </div>
                   <div className="col-md-4">
                     <label className="font">Voucher Number</label>
-                    <input value={itemData.VoucherNumber || ""} className="font-control readonly" readOnly />
+                    <input
+                      value={itemData.VoucherNumber || ""}
+                      className="font-control readonly"
+                      readOnly
+                    />
                   </div>
                 </div>
               </div>
@@ -724,43 +882,63 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                   <div className="col-md-4">
                     <label className="font">MRN Date</label> : &nbsp;&nbsp;
                     <label className="fonttext">
-                      {itemData?.MRNDtae ? new Date(itemData.MRNDtae).toLocaleDateString("en-GB") : ""}
+                      {itemData?.MRNDtae
+                        ? new Date(itemData.MRNDtae).toLocaleDateString("en-GB")
+                        : ""}
                     </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">MRN Basic Amount</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData?.MRNBasicAmount}</label>
+                    <label className="font">MRN Basic Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.MRNBasicAmount}
+                    </label>
                   </div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label className="font">MRN GST Amount</label> : &nbsp;&nbsp;
+                    <label className="font">MRN GST Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">{itemData?.MRNGSTAmount}</label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">MRN Other Amount</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData?.MRNOtherAmount}</label>
+                    <label className="font">MRN Other Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.MRNOtherAmount}
+                    </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">MRNAmount including GST</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData?.MRNAmountwithGST}</label>
+                    <label className="font">MRNAmount including GST</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.MRNAmountwithGST}
+                    </label>
                   </div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label className="font">Requested Amount</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData?.RequestedAmountforPayment}</label>
+                    <label className="font">Requested Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.RequestedAmountforPayment}
+                    </label>
                   </div>
                 </div>
               </div>
 
-              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Payment Details</label></div>
+              <div className="heading1" style={{ marginTop: "10px" }}>
+                <label>Previous Payment Details</label>
+              </div>
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-12">
                     <div style={{ overflowX: "auto" }}>
                       <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
-                        <thead className="text-white" style={{ backgroundColor: "rgb(60, 62, 69)" }}>
+                        <thead
+                          className="text-white"
+                          style={{ backgroundColor: "rgb(60, 62, 69)" }}
+                        >
                           <tr>
                             <th className="px-4 py-2">PO Number</th>
                             <th className="px-4 py-2">Previous Advance</th>
@@ -774,17 +952,40 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                         <tbody>
                           {previousAdvances.length === 0 ? (
                             <tr>
-                              <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>No previous advances available</td>
+                              <td
+                                colSpan={7}
+                                style={{ textAlign: "center", padding: "10px" }}
+                              >
+                                No previous advances available
+                              </td>
                             </tr>
                           ) : (
                             previousAdvances.map((item: any, index: number) => {
-                              const pending = Math.max(0, Number(item.RequestAdvanceAmount || 0) - Number(item.PaidAmount || 0));
+                              const pending = Math.max(
+                                0,
+                                Number(item.RequestAdvanceAmount || 0) -
+                                  Number(item.PaidAmount || 0),
+                              );
                               return (
                                 <tr key={index}>
                                   <td className="px-4 py-2">{item.PONumber}</td>
-                                  <td className="px-4 py-2">{item.RequestAdvanceAmount}</td>
-                                  <td className="px-4 py-2">{item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : ""}</td>
-                                  <td className="px-4 py-2">{item.VoucherDate ? new Date(item.VoucherDate).toLocaleDateString("en-GB") : ""}</td>
+                                  <td className="px-4 py-2">
+                                    {item.RequestAdvanceAmount}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.Created
+                                      ? new Date(
+                                          item.Created,
+                                        ).toLocaleDateString("en-GB")
+                                      : ""}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.VoucherDate
+                                      ? new Date(
+                                          item.VoucherDate,
+                                        ).toLocaleDateString("en-GB")
+                                      : ""}
+                                  </td>
                                   {/* <td className="px-4 py-2">{item.VouchingNumber}</td>
                                   <td className="px-4 py-2">{item.PaidAmount}</td>
                                   <td className="px-4 py-2">{pending}</td> */}
@@ -805,23 +1006,34 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label className="font">Final Payment Against PO</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData?.FinalPaymentAgainstPO ? "Yes" : "No"}</label>
+                    <label className="font">Final Payment Against PO</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.FinalPaymentAgainstPO ? "Yes" : "No"}
+                    </label>
                   </div>
                 </div>
                 {itemData?.FinalPaymentAgainstPO && (
                   <div className="row mb-20">
                     <div className="col-md-6">
-                      <label className="font">Installation Details</label> : &nbsp;&nbsp;
-                      <label className="fonttext">{itemData?.InstallationDetails}</label>
+                      <label className="font">Installation Details</label> :
+                      &nbsp;&nbsp;
+                      <label className="fonttext">
+                        {itemData?.InstallationDetails}
+                      </label>
                     </div>
                   </div>
                 )}
                 {!itemData?.FinalPaymentAgainstPO && (
                   <div className="row mb-20">
                     <div className="col-md-6">
-                      <label className="font">Installation Request Number</label> : &nbsp;&nbsp;
-                      <label className="fonttext">{itemData?.InstallationRequestNumber}</label>
+                      <label className="font">
+                        Installation Request Number
+                      </label>{" "}
+                      : &nbsp;&nbsp;
+                      <label className="fonttext">
+                        {itemData?.InstallationRequestNumber}
+                      </label>
                     </div>
                   </div>
                 )}
@@ -834,13 +1046,24 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Attachments</label>
+
                     {attachments.length === 0 ? (
                       <p>No attachments</p>
                     ) : (
                       <ul>
                         {attachments.map((file: any, index: number) => (
                           <li key={index}>
-                            <a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                window.open(
+                                  file.ServerRelativeUrl,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                );
+                              }}
+                            >
                               {file.Name}
                             </a>
                           </li>
@@ -903,31 +1126,60 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
 
                     {savedUtrAttachments.length > 0 && (
                       <>
-                        <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
+                        <p
+                          style={{
+                            margin: "8px 0 2px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                          }}
+                        >
                           Already saved:
                         </p>
                         <ul style={{ marginBottom: "8px" }}>
-                          {savedUtrAttachments.map((file: any, index: number) => (
-                            <li key={`saved-${index}`}>
-                              <a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">
-                                {file.Name}
-                              </a>
-                            </li>
-                          ))}
+                          {savedUtrAttachments.map(
+                            (file: any, index: number) => (
+                              <li key={`saved-${index}`}>
+                                <a
+                                  href={file.ServerRelativeUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {file.Name}
+                                </a>
+                              </li>
+                            ),
+                          )}
                         </ul>
                       </>
                     )}
 
                     {utrFiles.length > 0 && (
                       <>
-                        <p style={{ margin: "8px 0 2px", fontSize: "12px", fontWeight: 600 }}>
+                        <p
+                          style={{
+                            margin: "8px 0 2px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                          }}
+                        >
                           Pending upload:
                         </p>
-                        <ul style={{ marginTop: "0", paddingLeft: "0", listStyle: "none" }}>
+                        <ul
+                          style={{
+                            marginTop: "0",
+                            paddingLeft: "0",
+                            listStyle: "none",
+                          }}
+                        >
                           {utrFiles.map((file: File, index: number) => (
                             <li
                               key={index}
-                              style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                                marginBottom: "4px",
+                              }}
                             >
                               <a
                                 href={URL.createObjectURL(file)}
@@ -970,26 +1222,52 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                       <p>No history available</p>
                     ) : (
                       <div className="workflow-history">
-                        <table className="workflow-table" style={{ width: "100%" }}>
+                        <table
+                          className="workflow-table"
+                          style={{ width: "100%" }}
+                        >
                           <thead>
                             <tr>
-                              <th style={{ padding: "8px", textAlign: "left" }}>Action By</th>
-                              <th style={{ padding: "8px", textAlign: "left" }}>Action Taken</th>
-                              <th style={{ padding: "8px", textAlign: "left" }}>Date</th>
-                              <th style={{ padding: "8px", textAlign: "left" }}>Comment</th>
+                              <th style={{ padding: "8px", textAlign: "left" }}>
+                                Action By
+                              </th>
+                              <th style={{ padding: "8px", textAlign: "left" }}>
+                                Action Taken
+                              </th>
+                              <th style={{ padding: "8px", textAlign: "left" }}>
+                                Date
+                              </th>
+                              <th style={{ padding: "8px", textAlign: "left" }}>
+                                Comment
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
                             {workflowHistory
-                              .filter((h: any) => h.ActionTaken && h.ActionTaken !== "Draft Saved" && h.ActionTaken !== "Edited")
+                              .filter(
+                                (h: any) =>
+                                  h.ActionTaken &&
+                                  h.ActionTaken !== "Draft Saved" &&
+                                  h.ActionTaken !== "Edited",
+                              )
                               .map((h: any, idx: number) => (
                                 <tr key={idx}>
-                                  <td style={{ padding: "8px" }}>{h.CurrentApprover || ""}</td>
-                                  <td style={{ padding: "8px" }}>{h.ActionTaken || ""}</td>
                                   <td style={{ padding: "8px" }}>
-                                    {h.Date ? new Date(h.Date).toLocaleDateString("en-GB") : ""}
+                                    {h.CurrentApprover || ""}
                                   </td>
-                                  <td style={{ padding: "8px" }}>{h.Comment || ""}</td>
+                                  <td style={{ padding: "8px" }}>
+                                    {h.ActionTaken || ""}
+                                  </td>
+                                  <td style={{ padding: "8px" }}>
+                                    {h.Date
+                                      ? new Date(h.Date).toLocaleDateString(
+                                          "en-GB",
+                                        )
+                                      : ""}
+                                  </td>
+                                  <td style={{ padding: "8px" }}>
+                                    {h.Comment || ""}
+                                  </td>
                                 </tr>
                               ))}
                           </tbody>
@@ -1002,7 +1280,14 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
 
               <div className="row my-3">
                 <div className="col-md-12">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "5px",
+                    }}
+                  >
                     <a
                       className={`submit-btn ${isSubmitting ? "disabled-btn" : ""}`}
                       onClick={!isSubmitting ? handleApprove : undefined}

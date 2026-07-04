@@ -138,47 +138,10 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     }
   };
 
-  // const getLoggedInUser = async () => {
-  //   try {
-  //     const currentUser = await sp.web.currentUser();
-  //     const email = currentUser.Email;
-  //     const user = await sp.web.lists
-  //       .getByTitle("EmployeeMaster")
-  //       .items.select(
-  //         "EmployeeCode",
-  //         "EmployeeName",
-  //         "Division",
-  //         "Location",
-  //         "EmployeeEmail",
-  //         "ReportingManager/Title",
-  //         "ReportingManager/Id",
-  //         "HOD/Title",
-  //         "HOD/Id",
-  //         "ContactNo",
-  //         "EmployeeStatus",
-  //         "CostCenter",
-  //       )
-  //       .expand("ReportingManager", "HOD")
-  //       .filter(`EmployeeEmail eq '${email}'`)
-  //       .top(1)();
-  //     if (user.length > 0) {
-  //       setEmployee(user[0]);
-  //       employeeRef.current = user[0];
-  //       buildApprovalPreview(user[0]);
-  //     }
-  //   } catch (error) {
-  //     console.log("Error fetching user:", error);
-  //   }
-  // };
-
   const ensureUser = async (email: string): Promise<number> => {
-
     if (!email) return 0;
-
     try {
-
       const webUrl = context.pageContext.web.absoluteUrl;
-
       const response = await context.spHttpClient.post(
         `${webUrl}/_api/web/ensureuser`,
         SPHttpClient.configurations.v1,
@@ -192,30 +155,22 @@ const NewAdvanceform = ({ context, onClose }: any) => {
           })
         }
       );
-
       if (!response.ok) {
-
         console.log("ensureUser failed for:", email);
-
         return 0;
       }
-
       const data = await response.json();
-
       return data.Id || 0;
-
     } catch (error) {
-
       console.log("ensureUser error:", email, error);
-
       return 0;
     }
   };
+
   const getLoggedInUser = async () => {
     try {
       const toTitleCase = (str: string): string => {
         if (!str) return "";
-
         return str
           .toLowerCase()
           .split(" ")
@@ -405,30 +360,29 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
-    if (month >= 4)
-      return `${year.toString().slice(-2)}-${(year + 1).toString().slice(-2)}`;
-    return `${(year - 1).toString().slice(-2)}-${year.toString().slice(-2)}`;
+    return (month >= 4 ? year + 1 : year).toString().slice(-2);
   };
 
-  const generateCapexId = async () => {
+  const generatePaymentId = async (): Promise<string> => {
     try {
       const fy = getFinancialYear();
-      const items = await sp.web.lists
-        .getByTitle("CapexPayment")
-        .items.select("CapexId", "ID")
-        .filter(`startswith(CapexId,'CPX-PYMT/${fy}/')`)
-        .orderBy("ID", false)
+      const incrementalData = await sp.web.lists
+        .getByTitle("CapexPaymentIncrementalID")
+        .items.select("Id", "IncrementalID")
+        .orderBy("Id", false)
         .top(1)();
-      let nextNumber = 1;
-      if (items.length > 0 && items[0].CapexId) {
-        const parts = items[0].CapexId.split("/");
-        if (parts.length === 3) {
-          const lastNumber = parseInt(parts[2]);
-          if (!isNaN(lastNumber)) nextNumber = lastNumber + 1;
-        }
-      }
+      const nextNumber =
+        incrementalData.length > 0 && incrementalData[0].IncrementalID
+          ? Number(incrementalData[0].IncrementalID) + 1
+          : 1;
+
+      await sp.web.lists.getByTitle("CapexPaymentIncrementalID").items.add({
+        //Title: `CPX-${nextNumber}`,
+        IncrementalID: nextNumber.toString(),
+      });
       return `CPX-PYMT/${fy}/${nextNumber.toString().padStart(5, "0")}`;
     } catch (error) {
+      console.error("Generate Payment ID Error:", error);
       return `CPX-PYMT/${getFinancialYear()}/00001`;
     }
   };
@@ -642,7 +596,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         return;
       }
       const emp = employeeRef.current;
-      const capexId = await generateCapexId();
+      const capexId = await generatePaymentId();
       const flow = await buildApprovalFlow(emp);
       const WorkflowHistory = [
         {
@@ -690,7 +644,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         });
         return;
       }
-      const capexId = await generateCapexId();
+      const capexId = await generatePaymentId();
       const flow = await buildApprovalFlow(emp);
       flow.forEach((f: any) => (f.Status = "Pending"));
       const WorkflowHistory = [
@@ -724,11 +678,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     }
   };
 
-  // React.useEffect(() => {
-  //   if (!context) return;
-  //   void getLoggedInUser();
-  //   void getVendors();
-  // }, [context]);
   React.useEffect(() => {
     if (!context) return;
 
@@ -743,7 +692,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
       await Promise.all([
         getLoggedInUser(),
         getVendors(),
-        // getPaidPOs(),
       ]);
     } catch (err) {
       console.error(err);
@@ -1232,7 +1180,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                         type="button"
                         onClick={() =>
                           window.open(
-                            `${context.pageContext.web.absoluteUrl}/SitePages/Installation.aspx`,
+                            `${context.pageContext.web.absoluteUrl}/SitePages/InstallationComm.aspx`,
                             "_blank",
                             "noopener,noreferrer",
                           )
@@ -1289,9 +1237,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                               <th className="px-4 py-2">Previous Advance</th>
                               <th className="px-4 py-2">Requested Date</th>
                               <th className="px-4 py-2">Paid Date</th>
-                              {/* <th className="px-4 py-2">MRN No</th>
-                              <th className="px-4 py-2">Settled Amount</th>
-                              <th className="px-4 py-2">Pending Advance</th> */}
                             </tr>
                           </thead>
                           <tbody>
@@ -1322,9 +1267,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                                         ? new Date(item.VoucherDate).toLocaleDateString()
                                         : ""}
                                     </td>
-                                    {/* <td>{item.VoucherNumber}</td>
-                                    <td>{item.PaidAmount}</td>
-                                    <td>{pending}</td> */}
                                   </tr>
                                 );
                               })

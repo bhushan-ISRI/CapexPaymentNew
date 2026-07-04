@@ -348,7 +348,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     try {
       if (!capexId) return;
       const safeCapexId = capexId.replace(/\//g, "_");
-      const folderPath = `/sites/SonaFinance/CapexPaymentDocs/${safeCapexId}`;
+      const folderPath = `/sites/RLY_Capex_UAT/CapexPaymentDocs/${safeCapexId}`;
       const files = await sp.web.getFolderByServerRelativePath(folderPath).files();
       setAttachments(files || []);
     } catch {
@@ -370,7 +370,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     try {
       if (!formData?.CapexId || selectedFiles.length === 0) return;
       const safe = formData.CapexId.replace(/\//g, "_");
-      const folderPath = `/sites/SonaFinance/CapexPaymentDocs/${safe}`;
+      const folderPath = `/sites/RLY_Capex_UAT/CapexPaymentDocs/${safe}`;
       await ensureFolder(folderPath);
       for (const file of selectedFiles) {
         await sp.web.getFolderByServerRelativePath(folderPath).files.addUsingPath(file.name, file, { Overwrite: true });
@@ -387,7 +387,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     try {
       if (!formData?.CapexId) return;
       const safeCapexId = formData.CapexId.replace(/\//g, "_");
-      const folderPath = `/sites/SonaFinance/CapexPaymentDocs/${safeCapexId}`;
+      const folderPath = `/sites/RLY_Capex_UAT/CapexPaymentDocs/${safeCapexId}`;
       await sp.web.getFolderByServerRelativePath(folderPath).files.getByUrl(fileName).recycle();
       setAttachments(attachments.filter((file: any) => file.Name !== fileName));
       await Swal.fire({ icon: "success", title: "Success", text: "Attachment deleted successfully.", confirmButtonText: "OK" });
@@ -1028,7 +1028,7 @@ if (pageLoading) {
                         type="button"
                         onClick={() =>
                           window.open(
-                            `${context.pageContext.web.absoluteUrl}/SitePages/Installation.aspx`,
+                            `${context.pageContext.web.absoluteUrl}/SitePages/InstallationComm.aspx`,
                             "_blank",
                             "noopener,noreferrer",
                           )

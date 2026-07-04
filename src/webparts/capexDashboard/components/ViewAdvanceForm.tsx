@@ -29,7 +29,9 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const [attachments, setAttachments] = useState<any[]>([]);
   const [utrAttachments, setUtrAttachments] = useState<any[]>([]);
   const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
-  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(
+    SPFx(context),
+  );
   const sp = spfi().using(SPFx(context));
   const [employee, setEmployee] = useState<any>({});
   const [vendors, setVendors] = useState<IVendor[]>([]);
@@ -161,21 +163,19 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     try {
       if (!formData?.Email) return;
       const user = await sp.web.lists
-        .getByTitle("EmployeeMaster")
+        .getByTitle("CapexPayment")
         .items.select(
           "EmployeeCode",
           "EmployeeName",
           "Division",
           "Location",
-          "EmployeeEmail",
-          "ReportingManager/Title",
-          "HOD/Title",
+          "Email",
+          "RM",
+          "HOD",
           "ContactNo",
           "EmployeeStatus",
-          "CostCenter",
         )
-        .expand("ReportingManager", "HOD")
-        .filter(`EmployeeEmail eq '${formData.Email}'`)
+        .filter(`Email eq '${formData.Email}'`)
         .top(1)();
       if (user.length > 0) setEmployee(user[0]);
     } catch (error) {
@@ -375,7 +375,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                   <div className="col-md-4">
                     <label className="font">Employee Email</label> :
                     &nbsp;&nbsp;
-                    <label className="fonttext">{employee.EmployeeEmail}</label>
+                    <label className="fonttext">{employee.Email}</label>
                   </div>
                 </div>
                 <div className="row mb-20">
@@ -403,12 +403,12 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                   <div className="col-md-4">
                     <label className="font">RM</label> : &nbsp;&nbsp;
                     <label className="fonttext">
-                      {employee.ReportingManager?.Title}
+                      {employee.RM}
                     </label>
                   </div>
                   <div className="col-md-4">
                     <label className="font">HOD</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{employee.HOD?.Title}</label>
+                    <label className="fonttext">{employee.HOD}</label>
                   </div>
                 </div>
               </div>
@@ -639,14 +639,26 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Attachments</label>
+
                     {attachments.length > 0 ? (
                       <ul>
                         {attachments.map((file: any, index: number) => (
                           <li key={index}>
                             <a
-                              href={toAbsoluteUrl(file.ServerRelativeUrl)}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+
+                                const fileUrl = toAbsoluteUrl(
+                                  file.ServerRelativeUrl,
+                                );
+
+                                window.open(
+                                  fileUrl,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                );
+                              }}
                             >
                               {file.Name}
                             </a>
@@ -793,14 +805,10 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
               </div>
 
               <div className="text-center my-3">
-                <button
-                    type="button"
-                    className="reset-btn"
-                    onClick={onClose}
-                >
-                    Exit
+                <button type="button" className="reset-btn" onClick={onClose}>
+                  Exit
                 </button>
-            </div>
+              </div>
             </div>
           </div>
         </div>

@@ -50,7 +50,9 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [vendors, setVendors] = useState<IVendor[]>([]);
   const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
-  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(
+    SPFx(context),
+  );
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
@@ -118,7 +120,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
           "CostCenter",
         )
         .expand("ReportingManager", "HOD")
-        .filter(`EmployeeEmail eq '${email}'`)
+        .filter(`Email eq '${email}'`)
         .top(1)();
       if (user.length > 0) setEmployee(user[0]);
     } catch (error) {
@@ -155,7 +157,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
           "Location",
           "RM",
           "HOD",
-          "VendorCode",       // FIX: plain text field, no expand needed
+          "VendorCode", // FIX: plain text field, no expand needed
           "VendorName",
           "PODate",
           "InstallationDetails",
@@ -951,6 +953,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Attachments</label>
+
                     {attachments.length === 0 ? (
                       <p>No attachments</p>
                     ) : (
@@ -958,9 +961,16 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                         {attachments.map((file: any, index: number) => (
                           <li key={index}>
                             <a
-                              href={file.ServerRelativeUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+
+                                window.open(
+                                  file.ServerRelativeUrl,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                );
+                              }}
                             >
                               {file.Name}
                             </a>

@@ -15,9 +15,6 @@ interface UserDashboardProps {
   context: any;
 }
 
-// ================= HELPERS (same pattern as CustomerPO ApproverDashboard) =================
-// Capex WorkflowHistory entries store the actor under "CurrentApprover" (display name)
-// instead of "ActionBy" like CustomerPO, and use "ActionTaken" instead of "Action".
 interface IWorkflowHistoryEntry {
   CurrentApprover?: string;
   ActionTaken?: string;
@@ -35,10 +32,6 @@ const parseWorkflowHistory = (raw?: string | any[] | null): IWorkflowHistoryEntr
   }
 };
 
-// Checks whether the logged-in user is the one who actually performed the given
-// action (Paid / Rejected) on this item, rather than relying on Status +
-// CurrentApproverId — CurrentApproverId is cleared to null once an item is
-// Paid or Rejected, so it can never be used to find those items afterwards.
 const userTookAction = (
   rawHistory: string | any[] | null | undefined,
   loggedInUser: string,
@@ -105,11 +98,6 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     }
   };
 
-  // ================= FETCH DATA =================
-  // Only "My Request" (Pending for Approval) can be filtered server-side by
-  // CurrentApproverId, since that field is still populated for pending items.
-  // Paid and Rejected are fetched broadly here and filtered client-side against
-  // WorkflowHistory (see filteredData below) — same approach as CustomerPO.
   const getCapexData = async () => {
     try {
       let filterQuery = "";
@@ -204,7 +192,6 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         <ApproverAdvanceForm
           context={context}
           itemId={selectedItem?.ID}
-          // ✅ ADDED: onClose prop — was completely missing before
           onClose={() => {
             setShowForm(false);
             setFormType(null);

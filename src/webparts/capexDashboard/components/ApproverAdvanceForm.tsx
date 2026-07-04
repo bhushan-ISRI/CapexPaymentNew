@@ -39,7 +39,9 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
   const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
-  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(
+    SPFx(context),
+  );
   const [itemData, setItemData] = useState<any>(null);
   const [mrnNumber, setMrnNumber] = useState("");
   const [mrnDate, setMrnDate] = useState("");
@@ -160,11 +162,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
         )();
 
       setItemData(item);
-      // VendorCode on CapexPayment is a plain text field (the vendor code string),
-      // NOT a SharePoint Lookup — so there's no item.VendorCode.Id to read here.
-      // We resolve the real VendorMaster list-item Id by matching this text value
-      // against the vendors list once it's loaded (see the useEffect below),
-      // the same way ViewAdvanceForm/EditAdvanceForm do it.
       setSelectedVendorCode(item?.VendorCode || "");
       setSelectedVendorName(item?.VendorName || "");
       if (item.CapexId) await getAttachments(item.CapexId);
@@ -210,11 +207,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
     void loadData();
   }, [context, itemId]);
 
-  // Resolve the VendorMaster Id by matching the saved VendorCode text against the
-  // vendors list (same pattern as ViewAdvanceForm/EditAdvanceForm), then use that
-  // real Id to pull Previous Advances. This fixes the table always showing empty,
-  // which happened because selectedVendorId was previously read from
-  // item.VendorCode.Id — undefined, since VendorCode is text, not a Lookup.
   useEffect(() => {
     if (vendors.length > 0 && selectedVendorCode) {
       const match = vendors.find((v) => v.VendorCode === selectedVendorCode);
@@ -273,7 +265,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
           finalStatus = "Pending for Approval";
         }
       } else {
-        // No next step at all — fully approved
         finalStatus = "Approved";
       }
 
@@ -919,6 +910,7 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Attachments</label>
+
                     {attachments.length === 0 ? (
                       <p>No attachments found</p>
                     ) : (
@@ -926,9 +918,16 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
                         {attachments.map((file: any, index: number) => (
                           <li key={index}>
                             <a
-                              href={file.ServerRelativeUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+
+                                window.open(
+                                  file.ServerRelativeUrl,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                );
+                              }}
                             >
                               {file.Name}
                             </a>
