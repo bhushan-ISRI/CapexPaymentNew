@@ -312,7 +312,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                       paginatedData.map((item, i) => (
                         <tr key={i}>
                           <td className="px-4 py-2">
-                            {(activeMenu === "Paid" || activeMenu === "Rejected") && (
+                            {(activeMenu === "Paid" || activeMenu === "Rejected" || activeMenu === "My Request") && (
                               <span onClick={() => handleViewClick(item)} style={{ cursor: "pointer", marginRight: "10px" }}>
                                 <img src={View} width={15} alt="View" />
                               </span>

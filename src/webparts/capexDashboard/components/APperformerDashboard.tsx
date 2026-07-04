@@ -464,7 +464,8 @@ const APperformerDashboard: React.FC<UserDashboardProps> = ({ context }) => {
                       <tr key={i}>
                         <td className="px-4 py-2">
                           {(activeMenu === "Paid" ||
-                            activeMenu === "Rejected") && (
+                            activeMenu === "Rejected" ||
+                            activeMenu === "My Request") && (
                             <span
                               onClick={() => handleViewClick(item)}
                               style={{ cursor: "pointer", marginRight: "10px" }}
