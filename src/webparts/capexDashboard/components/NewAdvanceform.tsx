@@ -184,21 +184,63 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         return location.replace(/^re\s+/i, "").trim();
       };
 
-      const FLOW_URL =
-        "https://defaultcb1edbfe8080457d9cae51528f3643.3f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e2bb522aa41443179a72b701b9613471/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=q8b8ADCtK2eKr2f6p3MX7gxmJymPeJbm0mq2M69Rk8E";
+      // const FLOW_URL =
+      //   "https://defaultcb1edbfe8080457d9cae51528f3643.3f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e2bb522aa41443179a72b701b9613471/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=q8b8ADCtK2eKr2f6p3MX7gxmJymPeJbm0mq2M69Rk8E";
 
-      const fetchPage = async (pageNumber: number) => {
-        const response = await fetch(FLOW_URL, {
+      // const fetchPage = async (pageNumber: number) => {
+      //   const response = await fetch(FLOW_URL, {
+      //     method: "POST",
+      //     headers: {
+      //       "Content-Type": "application/json",
+      //     },
+      //     body: JSON.stringify({
+      //       PageSize: 500,
+      //       PageNumber: pageNumber,
+      //     }),
+      //   });
+
+      //   if (!response.ok) {
+      //     throw new Error("Failed to fetch employee data");
+      //   }
+
+      //   return response.json();
+      // };
+        const fetchPage = async (pageNumber: number) => {
+       
+        const username = "0le867nyvalvfo249e6sj4ri";
+        const password = "2mpvr7r19amf7o01hr0qncr861hmtsb7o9ap51hwar72405atj3y73mndkmokg5i";
+
+        const auth = btoa(`${username}:${password}`);
+
+        const responsesevices = await fetch(
+          "https://mservices.zinghr.com/etl/api/v2/Auth/GenerateJWTToken?apiPermission=GEMD",
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Basic ${auth}`,
+              "Accept": "application/json",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const ServicedataToken = await responsesevices.json();
+        console.log(ServicedataToken.data);
+
+         const response = await fetch("https://mservices.zinghr.com/etl/api/v2/Employee/GetEmployeeDetails", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${ServicedataToken.data}`,
+            "ClientSecret": "2mpvr7r19amf7o01hr0qncr861hmtsb7o9ap51hwar72405atj3y73mndkmokg5i"
           },
           body: JSON.stringify({
             PageSize: 500,
             PageNumber: pageNumber,
           }),
         });
-
+        // const data = await response.json();
+        // console.log("Employee data:", data);
         if (!response.ok) {
           throw new Error("Failed to fetch employee data");
         }
