@@ -418,7 +418,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
           ? Number(incrementalData[0].IncrementalID) + 1
           : 1;
 
-      await sp.web.lists.getByTitle("CapexPaymentIncrementalID").items.add({
+      await sp.web.lists.getByTitle("CapexPaymentIncrementalID").items.getById(incrementalData[0].Id).update({
         //Title: `CPX-${nextNumber}`,
         IncrementalID: nextNumber.toString(),
       });

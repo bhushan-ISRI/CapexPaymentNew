@@ -235,8 +235,8 @@ const ApproverAdvanceForm: React.FC<IProps> = ({
       const flow = itemData.ApprovalMatrix
         ? JSON.parse(itemData.ApprovalMatrix)
         : [];
-      const currentUser = context.pageContext.user.displayName;
-      const currentIndex = flow.findIndex((a: any) => a.Name === currentUser);
+      const currentUser = context.pageContext.legacyPageContext.userId;
+      const currentIndex = flow.findIndex((a: any) => a.Id === currentUser && a.Status === "In Progress");
 
       if (currentIndex === -1) {
         await Swal.fire({

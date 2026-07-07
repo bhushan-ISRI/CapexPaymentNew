@@ -130,11 +130,14 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
 
   const getAttachments = async (capexId: string) => {
     try {
-      const safe = capexId.replace(/\//g, "_");
-      const path = `/sites/SonaFinance/CapexPaymentDocs/${safe}`;
-      const files = await sp.web.getFolderByServerRelativePath(path).files();
-      setAttachments(files);
-    } catch {
+      if (!capexId) return;
+      const safeCapexId = capexId.replace(/\//g, "_");
+      const folderPath = `CapexPaymentDocs/${safeCapexId}`;
+      const files = await sp.web
+        .getFolderByServerRelativePath(folderPath)
+        .files();
+      setAttachments(files || []);
+    } catch (error) {
       setAttachments([]);
     }
   };
