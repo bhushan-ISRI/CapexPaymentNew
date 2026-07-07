@@ -125,70 +125,37 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
-  // const getLoggedInUser = async () => {
-  //   try {
-  //     const currentUser = await sp.web.currentUser();
-  //     const email = currentUser.Email;
-  //     const user = await sp.web.lists
-  //       .getByTitle("EmployeeMaster")
-  //       .items.select(
-  //         "EmployeeCode", "EmployeeName", "Division", "Location", "EmployeeEmail",
-  //         "ReportingManager/Title", "ReportingManager/Id",
-  //         "HOD/Title", "HOD/Id", "ContactNo", "EmployeeStatus", "CostCenter",
-  //       )
-  //       .expand("ReportingManager", "HOD")
-  //       .filter(`EmployeeEmail eq '${email}'`)
-  //       .top(1)();
-  //     if (user.length > 0) setEmployee(user[0]);
-  //   } catch (error) {
-  //     console.log("Error fetching user:", error);
-  //   }
-  // };
   const ensureUser = async (email: string): Promise<number> => {
-
     if (!email) return 0;
-
     try {
-
       const webUrl = context.pageContext.web.absoluteUrl;
-
       const response = await context.spHttpClient.post(
         `${webUrl}/_api/web/ensureuser`,
         SPHttpClient.configurations.v1,
         {
           headers: {
-            "Accept": "application/json;odata=nometadata",
-            "Content-Type": "application/json"
+            Accept: "application/json;odata=nometadata",
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            logonName: email
-          })
-        }
+          body: JSON.stringify({ logonName: email }),
+        },
       );
-
       if (!response.ok) {
-
         console.log("ensureUser failed for:", email);
-
         return 0;
       }
-
       const data = await response.json();
-
       return data.Id || 0;
-
     } catch (error) {
-
       console.log("ensureUser error:", email, error);
-
       return 0;
     }
   };
+
   const getLoggedInUser = async () => {
     try {
       const toTitleCase = (str: string): string => {
         if (!str) return "";
-
         return str
           .toLowerCase()
           .split(" ")
@@ -202,47 +169,55 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         return location.replace(/^re\s+/i, "").trim();
       };
 
-      const FLOW_URL =
-        "https://defaultcb1edbfe8080457d9cae51528f3643.3f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e2bb522aa41443179a72b701b9613471/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=q8b8ADCtK2eKr2f6p3MX7gxmJymPeJbm0mq2M69Rk8E";
+      const username = "0le867nyvalvfo249e6sj4ri";
+      const password = "2mpvr7r19amf7o01hr0qncr861hmtsb7o9ap51hwar72405atj3y73mndkmokg5i";
+      const auth = btoa(`${username}:${password}`);
 
-      const fetchPage = async (pageNumber: number) => {
-        const response = await fetch(FLOW_URL, {
-          method: "POST",
+      const tokenResponse = await fetch(
+        "https://mservices.zinghr.com/etl/api/v2/Auth/GenerateJWTToken?apiPermission=GEMD",
+        {
+          method: "GET",
           headers: {
+            Authorization: `Basic ${auth}`,
+            Accept: "application/json",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            PageSize: 500,
-            PageNumber: pageNumber,
-          }),
-        });
+        },
+      );
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch employee data");
-        }
+      if (!tokenResponse.ok) throw new Error("Failed to generate ZingHR token");
+      const tokenData = await tokenResponse.json();
+      const jwtToken = tokenData.data;
 
+      const fetchPage = async (pageNumber: number) => {
+        const response = await fetch(
+          "https://mservices.zinghr.com/etl/api/v2/Employee/GetEmployeeDetails",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwtToken}`,
+              ClientSecret: password,
+            },
+            body: JSON.stringify({ PageSize: 500, PageNumber: pageNumber }),
+          },
+        );
+        if (!response.ok) throw new Error("Failed to fetch employee data");
         return response.json();
       };
 
-      const currentUserEmail =
-        context.pageContext.user.email.toLowerCase();
-
+      const currentUserEmail = context.pageContext.user.email.toLowerCase();
       let employee: any = null;
       let page = 1;
 
       while (true) {
         const res = await fetchPage(page);
-
         const employees = res?.data?.employees || [];
-
         employee = employees.find(
-          (x: any) => x.email?.toLowerCase() === currentUserEmail
+          (x: any) => x.email?.toLowerCase() === currentUserEmail,
         );
-
         if (employee) break;
-
         if (employees.length < 500) break;
-
         page++;
       }
 
@@ -254,23 +229,16 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       const attributes = employee.attributes || [];
 
       const locationAttr = attributes.find(
-        (x: any) =>
-          x.attributeTypeDescription?.toLowerCase() === "location"
+        (x: any) => x.attributeTypeDescription?.toLowerCase() === "location",
       );
-
       const departmentAttr = attributes.find(
-        (x: any) =>
-          x.attributeTypeDescription?.toLowerCase() === "department"
+        (x: any) => x.attributeTypeDescription?.toLowerCase() === "department",
       );
-
       const hodEmailAttr = attributes.find(
-        (x: any) =>
-          x.attributeTypeDescription?.toLowerCase() === "hod_email"
+        (x: any) => x.attributeTypeDescription?.toLowerCase() === "hod_email",
       );
-
       const hodNameAttr = attributes.find(
-        (x: any) =>
-          x.attributeTypeDescription?.toLowerCase() === "hod name"
+        (x: any) => x.attributeTypeDescription?.toLowerCase() === "hod name",
       );
 
       let rmUserId = 0;
@@ -280,41 +248,35 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
         if (employee.reportingManagerEmail) {
           rmUserId = await ensureUser(employee.reportingManagerEmail);
         }
-
         if (hodEmailAttr?.attributeTypeUnitDescription) {
           hodUserId = await ensureUser(
-            hodEmailAttr.attributeTypeUnitDescription
+            hodEmailAttr.attributeTypeUnitDescription,
           );
         }
       } catch (err) {
         console.log("ensureUser error:", err);
       }
 
-
-
       setEmployee({
         EmployeeCode: employee.employeeCode || "",
         EmployeeName: toTitleCase(employee.employeeName || ""),
         Division: departmentAttr?.attributeTypeUnitDescription || "",
         Location: cleanLocationForDisplay(
-          locationAttr?.attributeTypeUnitDescription || ""
+          locationAttr?.attributeTypeUnitDescription || "",
         ),
         EmployeeEmail: employee.email || "",
         ContactNo: employee.mobileNo || "",
         EmployeeStatus: employee.employeeStatus || "",
         CostCenter: employee.costCenter || "",
-
         ReportingManager: {
           Id: rmUserId,
           Title: employee.reportingManagerName || "",
         },
-
         HOD: {
           Id: hodUserId,
           Title: hodNameAttr?.attributeTypeUnitDescription || "",
         },
       });
-
     } catch (error) {
       console.error("Error fetching user:", error);
     }
@@ -598,23 +560,22 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
   }, [vendors, selectedVendorCode]);
 
   useEffect(() => {
-  void loadPage();
-}, []);
+    void loadPage();
+  }, []);
 
- const loadPage = async () => {
-  try {
-    setPageLoading(true);
-
-    await Promise.all([
-      getLoggedInUser(),
-      getVendors(),
-    ]);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setPageLoading(false);
-  }
-};
+  const loadPage = async () => {
+    try {
+      setPageLoading(true);
+      await Promise.all([
+        getLoggedInUser(),
+        getVendors(),
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -680,47 +641,40 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
       default: return "";
     }
   };
-if (pageLoading) {
-  return (
-    <div className="MainUplodForm">
-      <div className="skeletonWrapper">
 
-        <div className="skeletonHeader"></div>
-
-        <div className="skeletonRibbon"></div>
-
-        {[1, 2, 3, 4, 5, 6].map((item) => (
-          <div className="skeletonSection" key={item}>
-            <div className="skeletonTitle"></div>
-
-            <div className="row">
-              <div className="col-md-4">
-                <div className="skeletonInput"></div>
-              </div>
-
-              <div className="col-md-4">
-                <div className="skeletonInput"></div>
-              </div>
-
-              <div className="col-md-4">
-                <div className="skeletonInput"></div>
+  if (pageLoading) {
+    return (
+      <div className="MainUplodForm">
+        <div className="skeletonWrapper">
+          <div className="skeletonHeader"></div>
+          <div className="skeletonRibbon"></div>
+          {[1, 2, 3, 4, 5, 6].map((item) => (
+            <div className="skeletonSection" key={item}>
+              <div className="skeletonTitle"></div>
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="skeletonInput"></div>
+                </div>
+                <div className="col-md-4">
+                  <div className="skeletonInput"></div>
+                </div>
+                <div className="col-md-4">
+                  <div className="skeletonInput"></div>
+                </div>
               </div>
             </div>
+          ))}
+          <div className="skeletonTable"></div>
+          <div className="skeletonButtonGroup">
+            <div className="skeletonButton"></div>
+            <div className="skeletonButton"></div>
+            <div className="skeletonButton"></div>
           </div>
-        ))}
-
-        <div className="skeletonTable"></div>
-
-        <div className="skeletonButtonGroup">
-          <div className="skeletonButton"></div>
-          <div className="skeletonButton"></div>
-          <div className="skeletonButton"></div>
         </div>
-
       </div>
-    </div>
-  );
-}
+    );
+  }
+
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row">
@@ -977,9 +931,6 @@ if (pageLoading) {
                             <th className="px-4 py-2">Previous Advance</th>
                             <th className="px-4 py-2">Requested Date</th>
                             <th className="px-4 py-2">Paid Date</th>
-                            {/* <th className="px-4 py-2">MRN No</th>
-                            <th className="px-4 py-2">Settled Amount</th>
-                            <th className="px-4 py-2">Pending Advance</th> */}
                           </tr>
                         </thead>
                         <tbody>
@@ -998,13 +949,10 @@ if (pageLoading) {
                                   <td className="px-4 py-2">{item.RequestAdvanceAmount}</td>
                                   <td className="px-4 py-2">{item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : ""}</td>
                                   <td className="px-4 py-2">{item.VoucherDate ? new Date(item.VoucherDate).toLocaleDateString("en-GB") : ""}</td>
-                                  {/* <td className="px-4 py-2">{item.VouchingNumber}</td>
-                                  <td className="px-4 py-2">{item.PaidAmount}</td>
-                                  <td className="px-4 py-2">{pending}</td> */}
                                 </tr>
                               );
                             })
-                          )}     
+                          )}
                         </tbody>
                       </table>
                     </div>
